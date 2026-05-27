@@ -16,23 +16,53 @@ from bs4 import BeautifulSoup
 
 UA = {"User-Agent": "RadarFournisseursLocaux/1.0 (associé Super U)"}
 
-# Regex commune : "VILLE (12345)" ou "12345 VILLE"
-RE_COMMUNE_CP = re.compile(
-    r"(?:(\d{5})\s+([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\-\s']{1,60}))|"
-    r"(?:([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\-\s']{1,60})\s*[\(\-,]\s*(\d{5}))"
+# Pour les communes composées : on accepte un préfixe optionnel + le dernier mot composé.
+# Exemples capturés correctement :
+#   "Saint-Hilaire-Saint-Mesmin (45160)" → "Saint-Hilaire-Saint-Mesmin"
+#   "La Souterraine (23300)" → "La Souterraine"
+#   "Plaimpied-Givaudins (18340)" → "Plaimpied-Givaudins"
+#   "Écluses SAINT-HILAIRE-SAINT-MESMIN (45160)" → "SAINT-HILAIRE-SAINT-MESMIN"
+# Pattern : optionnel "La/Le/Les/Aux/Lès/etc." suivi d'UN mot composé (lettres + tirets + apostrophes)
+RE_COMMUNE_AVANT_CP = re.compile(
+    r"((?:(?:La|Le|Les|Aux|En|Lès|L['’]|D['’]|Sainte?)\s+)?"
+    r"[A-ZÀ-Ÿ][A-Za-zÀ-ÿ\-'']{1,60})"
+    r"\s*\(\s*(\d{5})\s*\)"
+)
+# Pattern "12345 VILLE" inversé
+RE_CP_AVANT_COMMUNE = re.compile(
+    r"(\d{5})\s+([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\-\s']{1,40}?)(?=\s{2,}|$|[,;])"
+)
+# Bruit à virer à la fin des noms scrapés
+RE_BRUIT_FIN_NOM = re.compile(
+    r"\s*(?:En savoir \+?|Découvrir|Voir la fiche|Lire la suite|>>|→).*$",
+    re.IGNORECASE,
 )
 
 
 def extraire_commune_cp(texte: str) -> tuple[str, str]:
-    """Cherche un couple (CP, commune) dans un texte libre."""
+    """Cherche un couple (commune, code_postal) dans un texte libre.
+    Privilégie la DERNIÈRE occurrence (souvent la commune réelle, le texte commence par le nom)."""
     if not texte:
         return "", ""
-    m = RE_COMMUNE_CP.search(texte)
-    if not m:
-        return "", ""
-    if m.group(1):  # forme "12345 VILLE"
+    # Préférence : pattern "VILLE (12345)"
+    matches = list(RE_COMMUNE_AVANT_CP.finditer(texte))
+    if matches:
+        last = matches[-1]
+        commune = last.group(1).strip(" ,-")
+        return commune, last.group(2)
+    # Fallback : "12345 VILLE"
+    m = RE_CP_AVANT_COMMUNE.search(texte)
+    if m:
         return m.group(2).strip(), m.group(1)
-    return m.group(3).strip(), m.group(4)
+    return "", ""
+
+
+def nettoyer_nom(nom: str) -> str:
+    """Vire le bruit en fin de nom (En savoir +, etc.) et limite la longueur."""
+    if not nom:
+        return ""
+    nom = RE_BRUIT_FIN_NOM.sub("", nom).strip()
+    return nom[:120].strip(" ,-")
 
 
 def fetch_html(url: str, timeout: int = 10) -> str | None:
@@ -105,16 +135,14 @@ def scrape_avec_config(html: str, config: dict, label_nom: str, base_url: str = 
                 if not commune:
                     commune = c_el.get_text(strip=True)
         if utiliser_regex and not commune:
-            # Nettoyer le nom de la trace ville
             commune, cp = extraire_commune_cp(txt_complet)
-            # Si on a trouvé une commune dans le texte global, ajuster le nom
             if commune and sel_nom is None:
-                # Le nom devient le début du texte avant la commune
-                idx = txt_complet.find(commune)
+                # Nom = ce qui précède la dernière occurrence de la commune dans le texte
+                idx = txt_complet.rfind(commune)
                 if idx > 0:
                     nom = txt_complet[:idx].strip(" ,(-")
-        nom = re.sub(r"\s+", " ", nom).strip()
-        if nom and len(nom) > 2 and len(nom) < 150:
+        nom = nettoyer_nom(re.sub(r"\s+", " ", nom))
+        if nom and len(nom) > 2:
             out.append({
                 "nom": nom,
                 "commune": commune,
@@ -151,7 +179,9 @@ def scrape_auto(html: str, label_nom: str, base_url: str = "") -> list[dict]:
             continue
         txt = el.get_text(" ", strip=True)
         commune, cp = extraire_commune_cp(txt)
-        nom = re.sub(r"\s+", " ", nom)[:120].strip()
+        nom = nettoyer_nom(re.sub(r"\s+", " ", nom))
+        if not nom or len(nom) < 3:
+            continue
         # URL de la fiche
         url_fiche = ""
         if el.name == "a" and el.get("href"):
