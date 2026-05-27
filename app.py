@@ -163,10 +163,34 @@ villes = charger_villes()
 # --------- Sidebar : paramètres magasin ----------
 with st.sidebar:
     st.header("Magasin")
+
+    # ----- Charger un preset enregistré -----
+    presets_list = list(villes.keys()) if villes else []
+    if presets_list:
+        col_load, col_btn = st.columns([3, 1])
+        with col_load:
+            preset_choisi = st.selectbox(
+                "Magasins enregistrés",
+                ["(nouveau)"] + presets_list,
+                key="preset_select",
+                label_visibility="visible",
+            )
+        with col_btn:
+            st.write("")  # alignement
+            if preset_choisi != "(nouveau)":
+                if st.button("📂", help="Charger ce preset", key="load_preset"):
+                    v = villes[preset_choisi]
+                    st.session_state["ville_search"] = v.get("adresse", "").split(",")[0]
+                    st.session_state["_preset_rayon"] = v.get("rayon_km", 30)
+                    st.session_state["_preset_nom"] = v.get("nom", "")
+                    st.rerun()
+
     query = st.text_input("Commune", "Saint-Benoît-du-Sault", key="ville_search",
                            help="Tape le nom de la commune (≥ 2 lettres). "
                                 "L'app suggère les correspondances officielles.")
-    rayon = st.slider("Rayon (km)", 5, 100, 30)
+    # Rayon : récupère valeur preset si on vient de charger un preset
+    rayon_default = st.session_state.pop("_preset_rayon", 30) if "_preset_rayon" in st.session_state else 30
+    rayon = st.slider("Rayon (km)", 5, 100, int(rayon_default))
 
     suggestions = chercher_communes(query)
     ville_choisie = None
@@ -192,7 +216,8 @@ with st.sidebar:
 
     if ville_choisie:
         adresse = f"{ville_choisie['city']}, {ville_choisie['postcode']}"
-        nom = f"Super U {ville_choisie['city']}"
+        # Nom : valeur preset si chargée, sinon "Super U {ville}" par défaut
+        nom_default = st.session_state.pop("_preset_nom", "") or f"Super U {ville_choisie['city']}"
         if ville_choisie.get("lat") and ville_choisie.get("lon"):
             deps_auto = departements_dans_rayon(
                 ville_choisie["lat"], ville_choisie["lon"], rayon, marge_km=80,
@@ -201,6 +226,11 @@ with st.sidebar:
         st.caption(
             f"📍 **{ville_choisie['city']}** ({ville_choisie['postcode']}) — dpt {ville_choisie['departement']}"
         )
+        nom = st.text_input("Libellé magasin", nom_default,
+                              help="Apparaît sur la carte et dans le nom de fichier export. "
+                                   "Pas obligé d'être 'Super U {ville}' — peux mettre 'Hyper U', 'U Express', etc.")
+    else:
+        nom = f"Super U {query}" if query else "Super U"
 
     deps_input = st.text_input(
         "Départements à interroger",
@@ -208,6 +238,47 @@ with st.sidebar:
         help="Pré-rempli avec les départements dont la préfecture est dans "
              "ton rayon + 80 km. Tu peux modifier la liste si besoin.",
     )
+
+    # ----- Sauvegarder ce magasin comme preset -----
+    if ville_choisie:
+        with st.expander("💾 Sauvegarder ce magasin", expanded=False):
+            slug_default = nom.lower().replace(" ", "_").replace("'", "").replace("-", "_")
+            slug = st.text_input("Clé (identifiant interne)", slug_default,
+                                  help="Sans espaces ni accents. Sert à charger le preset plus tard.")
+            col_save, col_dl = st.columns(2)
+            with col_save:
+                if st.button("Enregistrer dans villes.yaml"):
+                    nouveau = {
+                        "nom": nom,
+                        "adresse": adresse,
+                        "latitude": ville_choisie.get("lat"),
+                        "longitude": ville_choisie.get("lon"),
+                        "rayon_km": rayon,
+                        "departements": [d.strip() for d in deps_input.split(",") if d.strip()],
+                    }
+                    villes_path = ROOT / "villes.yaml"
+                    villes_actuelles = yaml.safe_load(villes_path.read_text(encoding="utf-8")) if villes_path.exists() else {}
+                    villes_actuelles[slug] = nouveau
+                    villes_path.write_text(
+                        yaml.safe_dump(villes_actuelles, allow_unicode=True, sort_keys=False),
+                        encoding="utf-8",
+                    )
+                    charger_villes.clear()  # invalide le cache
+                    st.success(f"Sauvé sous `{slug}`. Recharge la page pour le voir dans le menu.")
+                    st.caption("⚠️ Sur Streamlit Cloud, la sauvegarde est éphémère "
+                               "(reset à chaque redéploiement). Utilise le bouton ⬇️ pour télécharger "
+                               "et committer le YAML.")
+            with col_dl:
+                # Pour Streamlit Cloud : permet à Benjamin de récupérer le YAML et de le commit
+                villes_path = ROOT / "villes.yaml"
+                if villes_path.exists():
+                    st.download_button(
+                        "⬇️ villes.yaml",
+                        villes_path.read_bytes(),
+                        file_name="villes.yaml",
+                        mime="text/yaml",
+                        help="Télécharge le fichier mis à jour pour le committer sur GitHub",
+                    )
 
     with st.expander("Charger un preset (Saint-Benoît, Les Pieux, Vaucresson...)"):
         if villes:
