@@ -44,6 +44,26 @@ def _get(params: dict) -> dict:
     return {"results": [], "total_pages": 0, "total_results": 0}
 
 
+def verifier_siret_actif(siret: str) -> bool | None:
+    """Vérifie via l'API si un SIRET correspond à une entreprise active.
+    Renvoie True si actif, False si fermé/cessé, None si pas trouvé."""
+    if not siret or len(siret) != 14:
+        return None
+    try:
+        _throttle()
+        r = requests.get(BASE, params={"q": siret, "per_page": 1}, timeout=10)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        results = data.get("results") or []
+        if not results:
+            return False  # SIRET pas trouvé = probablement radié
+        etat = results[0].get("etat_administratif", "")
+        return etat == "A"
+    except requests.RequestException:
+        return None
+
+
 def chercher(code_naf: str, departements: Iterable[str], per_page: int = 25) -> list[dict]:
     """Récupère tous les résultats pour (code_naf, departements). Pagine avec plafond."""
     deps = ",".join(departements)

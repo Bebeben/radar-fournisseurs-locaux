@@ -12,12 +12,46 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import math
 import streamlit as st
 import yaml
 import pandas as pd
 import requests
 
 import radar
+
+
+# --------- Helper : auto-détection des départements dans un rayon ----------
+
+@st.cache_data
+def charger_dpt_geo() -> dict:
+    return yaml.safe_load(open(ROOT / "departements_geo.yaml", "r", encoding="utf-8")) if (ROOT / "departements_geo.yaml").exists() else {}
+
+
+def _haversine(lat1, lon1, lat2, lon2) -> float:
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1); dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlon/2)**2)
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def departements_dans_rayon(lat: float, lon: float, rayon_km: float, marge_km: float = 80) -> list[str]:
+    """Renvoie les codes département dont la préfecture est à <= rayon+marge du point.
+    Marge généreuse (80 km par défaut) pour capturer les départements voisins même grands.
+    """
+    geo = charger_dpt_geo()
+    if not geo:
+        return []
+    seuil = rayon_km + marge_km
+    out = []
+    for code, coords in geo.items():
+        if not coords or len(coords) < 2:
+            continue
+        d = _haversine(lat, lon, coords[0], coords[1])
+        if d <= seuil:
+            out.append((code, d))
+    out.sort(key=lambda x: x[1])
+    return [c for c, _ in out]
 
 
 # --------- Helper : autocomplete ville ----------
@@ -86,9 +120,110 @@ def charger_config_defaut():
 
 # --------------- UI ----------------
 
-st.set_page_config(page_title="Radar Fournisseurs Locaux", layout="wide", page_icon="🛒")
-st.title("Radar Fournisseurs Locaux")
-st.caption("Cartographier les producteurs alimentaires autour d'un magasin (Super U).")
+st.set_page_config(
+    page_title="Radar Fournisseurs Locaux — Super U",
+    layout="wide",
+    page_icon="🛒",
+)
+
+# ============= CHARTE GRAPHIQUE SUPER U =============
+# Rouge U : #E2001A — appliqué aux titres, boutons, accents
+st.markdown("""
+<style>
+    /* Logo U + bannière en haut */
+    .u-header {
+        background: #E2001A;
+        color: white;
+        padding: 18px 24px;
+        border-radius: 6px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        box-shadow: 0 2px 8px rgba(226, 0, 26, 0.15);
+    }
+    .u-logo {
+        background: white;
+        color: #E2001A;
+        font-weight: 900;
+        font-size: 42px;
+        line-height: 1;
+        padding: 8px 18px;
+        border-radius: 8px;
+        font-family: Arial, sans-serif;
+        letter-spacing: -2px;
+    }
+    .u-title-block {
+        flex: 1;
+    }
+    .u-title {
+        font-size: 26px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: 0.3px;
+    }
+    .u-baseline {
+        font-size: 14px;
+        opacity: 0.92;
+        margin-top: 2px;
+        font-style: italic;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    /* Titres et sous-titres en rouge U */
+    h1, h2, h3 {
+        color: #1A1A1A;
+    }
+    h2 {
+        border-bottom: 3px solid #E2001A;
+        padding-bottom: 6px;
+        margin-top: 28px;
+    }
+
+    /* Bouton principal en rouge U */
+    .stButton > button[kind="primary"] {
+        background-color: #E2001A;
+        border-color: #E2001A;
+        color: white;
+        font-weight: 600;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: #B30015;
+        border-color: #B30015;
+    }
+
+    /* Liens en rouge U */
+    a {
+        color: #E2001A;
+    }
+    a:hover {
+        color: #B30015;
+    }
+
+    /* Footer */
+    .u-footer {
+        margin-top: 60px;
+        padding: 20px;
+        border-top: 1px solid #E2001A;
+        text-align: center;
+        color: #666;
+        font-size: 12px;
+    }
+    .u-footer strong { color: #E2001A; }
+</style>
+
+<div class="u-header">
+    <div class="u-logo">U</div>
+    <div class="u-title-block">
+        <div class="u-title">Radar Fournisseurs Locaux</div>
+        <div class="u-baseline">Commerçants autrement</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.caption("Cartographie les producteurs alimentaires autour d'un magasin U. "
+           "SIRENE + Agence Bio + labels régionaux — outil interne pour l'identification de fournisseurs en vente directe.")
 
 config_def = charger_config_defaut()
 naf_map = charger_naf()
@@ -99,12 +234,14 @@ villes = charger_villes()
 with st.sidebar:
     st.header("Magasin")
     nom = st.text_input("Nom du magasin (libre)", "Super U Saint-Benoît-du-Sault")
+    rayon = st.slider("Rayon (km)", 5, 100, 30)
 
     # Autocomplete ville via API Adresse
     st.caption("Tape un nom de commune (≥ 2 lettres) :")
     query = st.text_input("Recherche commune", "Saint-Benoît-du-Sault", key="ville_search")
     suggestions = chercher_communes(query)
 
+    deps_auto: list[str] = []
     if suggestions:
         labels_suggest = [s["label"] for s in suggestions]
         choix_idx = st.selectbox("Choisir la bonne commune",
@@ -114,24 +251,29 @@ with st.sidebar:
                                   key="ville_choix")
         ville_choisie = suggestions[choix_idx]
         adresse = f"{ville_choisie['city']}, {ville_choisie['postcode']}"
-        st.success(f"Sélectionnée : **{ville_choisie['city']}** ({ville_choisie['postcode']}) "
-                   f"— dpt {ville_choisie['departement']}")
-        # Pré-remplir les départements à partir du département de la ville
-        dpt_principal = ville_choisie["departement"]
-        deps_default = dpt_principal
+        # Auto-détection des départements voisins
+        if ville_choisie.get("lat") and ville_choisie.get("lon"):
+            deps_auto = departements_dans_rayon(
+                ville_choisie["lat"], ville_choisie["lon"], rayon, marge_km=80,
+            )
+        st.success(
+            f"Sélectionnée : **{ville_choisie['city']}** ({ville_choisie['postcode']}) "
+            f"— dpt {ville_choisie['departement']} · "
+            f"voisins auto : {', '.join(deps_auto) if deps_auto else '(aucun)'}"
+        )
+        deps_default = ",".join(deps_auto) if deps_auto else ville_choisie["departement"]
     else:
         adresse = query if query else "Saint-Benoît-du-Sault, 36170"
-        dpt_principal = ""
         deps_default = "36,87,23"
         if query and len(query) >= 2:
             st.warning("Aucune commune trouvée. Tape les premières lettres du nom officiel.")
 
-    rayon = st.slider("Rayon (km)", 5, 100, 30)
     deps_input = st.text_input(
-        "Départements à interroger (codes séparés par virgule)",
+        "Départements à interroger",
         deps_default,
-        help="Pré-rempli avec le département de la commune. Ajoute les départements voisins "
-             "si ton rayon déborde dessus (séparés par virgule). Ex : '36,87,23' pour St-Benoît.",
+        help="Pré-rempli automatiquement avec les départements dont la préfecture est dans "
+             "ton rayon + 80 km de marge (généreux pour couvrir les frontières). "
+             "Tu peux modifier la liste à la main si besoin.",
     )
 
     with st.expander("Charger un preset (Saint-Benoît, Les Pieux, Vaucresson...)"):
@@ -339,3 +481,12 @@ if run_clicked:
                                file_name=f"{base}_carte.html", mime="text/html")
 else:
     st.info("Configure le magasin et les sources dans le panneau de gauche, puis clique sur **Lancer le radar**.")
+
+# Footer Charte U
+st.markdown("""
+<div class="u-footer">
+    <strong>U Commerçants autrement</strong> &nbsp;·&nbsp;
+    Radar Fournisseurs Locaux — outil interne d'identification de fournisseurs en vente directe<br>
+    Données : SIRENE (recherche-entreprises.api.gouv.fr) · Agence Bio · INAO · Labels régionaux scrapés
+</div>
+""", unsafe_allow_html=True)

@@ -221,11 +221,15 @@ def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dic
 
 def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: list[dict],
                                          cle_label: str, mag_lat: float, mag_lon: float,
-                                         rayon_km: float, categorie: str = "inconnu") -> int:
+                                         rayon_km: float, categorie: str = "inconnu",
+                                         verifier_actifs: bool = True) -> int:
     """Ajoute les items label qui n'ont matché aucun producteur SIRENE.
     Filtre par distance si l'item a des coordonnées.
+    Si verifier_actifs=True ET l'item a un SIRET, vérifie qu'il est actif (évite les fermés).
     """
+    from sources import sirene as _sirene
     n_ajoutes = 0
+    n_fermes = 0
     existants_noms = {(p.get("nom_complet") or "").lower() for p in producteurs}
     for item in items_label:
         nom = item.get("nom") or ""
@@ -241,8 +245,15 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
             except (TypeError, ValueError):
                 continue
         else:
-            # pas de coords : on ne peut pas trancher, on garde mais on flague
             pass
+
+        # Vérification d'activité via SIRENE si on a le SIRET (anti-fantômes type Baritaud)
+        siret = item.get("siret", "")
+        if verifier_actifs and siret:
+            actif = _sirene.verifier_siret_actif(siret)
+            if actif is False:
+                n_fermes += 1
+                continue
         url_fiche = item.get("url_fiche", "")
         nouveau = {
             "siren": "",
@@ -276,6 +287,10 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
         }
         producteurs.append(nouveau)
         n_ajoutes += 1
+    if n_fermes:
+        # Note : on aurait pu logger via _log mais cette fonction n'y a pas accès,
+        # le compteur est juste un retour secondaire.
+        pass
     return n_ajoutes
 
 

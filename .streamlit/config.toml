@@ -1,0 +1,13 @@
+# Thème graphique Super U "Commerçants autrement"
+# Rouge U : #E2001A — couleur signature des magasins U
+# Reste : blanc / noir / gris très clair pour le confort de lecture
+
+[theme]
+primaryColor = "#E2001A"               # Rouge U vif (boutons, accents, slider)
+backgroundColor = "#FFFFFF"            # Fond blanc franc
+secondaryBackgroundColor = "#F4F4F4"   # Gris très clair pour la sidebar
+textColor = "#1A1A1A"                  # Noir doux
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
