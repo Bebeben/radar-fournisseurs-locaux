@@ -1,4 +1,33 @@
-"""Sources labels — orchestrateur.
+"""Sources labels — orchestrateur."""
+
+# Helper de géocodage gratuit (api-adresse.data.gouv.fr) avec cache léger en mémoire
+_geo_cache: dict = {}
+
+
+def _geocoder_commune(commune: str, code_postal: str = "") -> tuple[float, float] | None:
+    """Géocode une commune via api-adresse (gratuit, sans clé). Renvoie (lat, lon) ou None."""
+    if not commune:
+        return None
+    cache_key = f"{commune}|{code_postal}".lower()
+    if cache_key in _geo_cache:
+        return _geo_cache[cache_key]
+    import requests as _rq
+    q = f"{commune} {code_postal}".strip()
+    try:
+        r = _rq.get("https://api-adresse.data.gouv.fr/search/",
+                    params={"q": q, "type": "municipality", "limit": 1}, timeout=5)
+        feats = (r.json() or {}).get("features") or []
+        if feats:
+            lon, lat = feats[0]["geometry"]["coordinates"]
+            _geo_cache[cache_key] = (lat, lon)
+            return (lat, lon)
+    except Exception:
+        pass
+    _geo_cache[cache_key] = None
+    return None
+
+
+"""
 
 Sources nationales (en Python, API spécifiques) :
 - Agence Bio (annuaire opérateurs bio)
@@ -126,16 +155,24 @@ def sources_regionales(departements_magasin: list[str], cache_dossier: str,
                 if enrichir_siret and items:
                     # Enrichit chaque item avec son SIRET via une recherche SIRENE
                     enriched = 0
+                    geocoded = 0
                     for it in items:
-                        if it.get("siret"):
-                            continue
-                        siret = _sirene.chercher_siret_par_nom_commune(
-                            it.get("nom", ""), it.get("commune", ""), it.get("code_postal", "")
-                        )
-                        if siret:
-                            it["siret"] = siret
-                            enriched += 1
-                    if verbose: print(f"[region:{nom}] {enriched}/{len(items)} items enrichis avec SIRET")
+                        if not it.get("siret"):
+                            siret = _sirene.chercher_siret_par_nom_commune(
+                                it.get("nom", ""), it.get("commune", ""), it.get("code_postal", "")
+                            )
+                            if siret:
+                                it["siret"] = siret
+                                enriched += 1
+                        # Géocodage si pas de coordonnées (permet filtrage rayon pour orphelins)
+                        if not (it.get("latitude") and it.get("longitude")):
+                            lat_lon = _geocoder_commune(it.get("commune", ""), it.get("code_postal", ""))
+                            if lat_lon:
+                                it["latitude"], it["longitude"] = lat_lon
+                                geocoded += 1
+                    if verbose:
+                        print(f"[region:{nom}] {enriched}/{len(items)} items enrichis SIRET, "
+                              f"{geocoded}/{len(items)} géocodés")
                 cache_util.save(cache_dossier, cache_key, items)
             except Exception as e:
                 if verbose: print(f"[region:{nom}] erreur: {e}")

@@ -212,12 +212,19 @@ _PREFIXES_BRUIT = _re_match.compile(
 
 
 def _normaliser_nom(nom: str) -> str:
-    """Normalisation pour le matching : minuscules, sans préfixes juridiques/civilités, sans ponctuation."""
+    """Normalisation pour le matching :
+    - minuscules
+    - tirets/apostrophes → espaces (AUPETIT-DUBOIS = AUPETIT DUBOIS pour le fuzzy)
+    - retrait des préfixes juridiques (GAEC, EARL...) et civilités (Mr, Mme...)
+    - retrait de la ponctuation autre que lettres/chiffres/espaces
+    """
     if not nom:
         return ""
     n = nom.lower()
+    # Tirets et apostrophes → espaces avant suppression des préfixes
+    n = n.replace("-", " ").replace("'", " ").replace("'", " ")
     n = _PREFIXES_BRUIT.sub(" ", n)
-    n = _re_match.sub(r"[^\w\s\-]", " ", n)
+    n = _re_match.sub(r"[^\w\s]", " ", n)
     n = _re_match.sub(r"\s+", " ", n).strip()
     return n
 
@@ -656,7 +663,10 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
                  + f"NAF : {r.get('code_naf','')} {r.get('libelle_naf','')}<br>"
                  f"Labels : {flags_str}<br>"
                  f"Dirigeant : {r.get('dirigeant_principal','')}<br>"
-                 f"Score : {r.get('score_pertinence',0)}")
+                 f"Score : {r.get('score_pertinence',0)} "
+                 f"<span title='Bio +2, EPV +3, Société à mission +1, EI +2, "
+                 f"petite taille (≤9 sal.) +1, chaque label matché +1' "
+                 f"style='cursor:help;color:#888'>(?)</span>")
         target = groupes_par_cat.get(cat)
         if target is None:
             # fallback (catégorie absente du df.unique pour une raison X) → on l'ajoute directement à la carte

@@ -66,14 +66,22 @@ def verifier_siret_actif(siret: str) -> bool | None:
 
 def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str = "") -> str | None:
     """Tente de récupérer le SIRET d'un producteur via son nom et sa commune.
-    Renvoie le SIRET (14 chiffres) si match unique, sinon None.
+
+    Renvoie le SIRET (14 chiffres) UNIQUEMENT si :
+    - L'API trouve un résultat
+    - Le nom du résultat SIRENE est cohérent avec le nom cherché (fuzzy >= 75)
+    - La commune ou le code postal correspondent
+
+    Si aucun résultat ne passe ces critères, renvoie None (ne pas inventer un faux SIRET).
     """
     if not nom or len(nom) < 4:
         return None
-    # Requête : nom + commune
-    q = nom
-    if commune:
-        q += f" {commune}"
+    try:
+        from rapidfuzz import fuzz
+    except ImportError:
+        fuzz = None
+
+    q = nom + (f" {commune}" if commune else "")
     try:
         _throttle()
         params = {"q": q, "per_page": 5, "etat_administratif": "A"}
@@ -84,15 +92,33 @@ def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str
         results = data.get("results") or []
         if not results:
             return None
-        # On retient le 1er résultat. Idéalement on filtrerait par code postal si fourni.
-        first = results[0]
-        siege = first.get("siege") or {}
-        if code_postal and siege.get("code_postal") != code_postal:
-            # Cherche un meilleur match dans les 5 premiers
-            for r_ in results:
-                if (r_.get("siege") or {}).get("code_postal") == code_postal:
-                    return (r_.get("siege") or {}).get("siret")
-        return siege.get("siret")
+
+        nom_lower = nom.lower()
+        commune_lower = (commune or "").lower()
+
+        for r_ in results:
+            siege = r_.get("siege") or {}
+            nom_sirene = (r_.get("nom_complet") or "").lower()
+            commune_sirene = (siege.get("libelle_commune") or "").lower()
+            cp_sirene = siege.get("code_postal") or ""
+
+            # Vérif 1 : commune / code postal cohérent
+            if code_postal and cp_sirene != code_postal:
+                continue
+            if commune_lower and commune_sirene and commune_lower != commune_sirene:
+                # Si on a fourni une commune et qu'elle ne matche pas, on rejette
+                continue
+
+            # Vérif 2 : le nom doit ressembler (fuzzy >= 75)
+            if fuzz:
+                score = fuzz.token_set_ratio(nom_lower, nom_sirene)
+                if score < 75:
+                    continue
+
+            siret = siege.get("siret")
+            if siret:
+                return siret
+        return None
     except requests.RequestException:
         return None
 
