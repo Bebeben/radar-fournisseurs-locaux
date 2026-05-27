@@ -494,7 +494,25 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
     ).add_to(m)
     folium.Circle([mag_lat, mag_lon], radius=rayon_km * 1000, color="black",
                   fill=False, weight=2, dash_array="5,5").add_to(m)
-    cluster = MarkerCluster().add_to(m)
+
+    # FeatureGroup par catégorie : un groupe de marqueurs par catégorie,
+    # chacun activable/désactivable depuis le LayerControl en haut à droite de la carte.
+    if df.empty:
+        cats_uniques = []
+    else:
+        cats_uniques = sorted(df["categorie"].dropna().unique().tolist())
+    groupes_par_cat = {}
+    for cat in cats_uniques:
+        couleur = CATEGORIES_COULEURS.get(cat, "gray")
+        # Compte des producteurs pour mettre le total dans le nom de la couche
+        n = int((df["categorie"] == cat).sum())
+        nom_groupe = f"{cat} ({n})"
+        # MarkerCluster propre à chaque catégorie pour ne pas charger la carte
+        fg = folium.FeatureGroup(name=nom_groupe, show=True)
+        cluster_cat = MarkerCluster().add_to(fg)
+        groupes_par_cat[cat] = cluster_cat
+        m.add_child(fg)
+
     for _, r in df.iterrows():
         if pd.isna(r.get("latitude")) or pd.isna(r.get("longitude")):
             continue
@@ -548,14 +566,23 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
                  f"Labels : {flags_str}<br>"
                  f"Dirigeant : {r.get('dirigeant_principal','')}<br>"
                  f"Score : {r.get('score_pertinence',0)}")
+        target = groupes_par_cat.get(cat)
+        if target is None:
+            # fallback (catégorie absente du df.unique pour une raison X) → on l'ajoute directement à la carte
+            target = m
         folium.Marker([lat, lon], popup=folium.Popup(popup, max_width=350),
-                      icon=folium.Icon(color=couleur, icon="leaf", prefix="fa")).add_to(cluster)
+                      icon=folium.Icon(color=couleur, icon="leaf", prefix="fa")).add_to(target)
 
-    # Légende
-    legende = "<div style='position: fixed; bottom: 30px; left: 30px; background: white; padding: 10px; border: 1px solid #888; z-index: 9999; font-size: 12px;'>"
-    legende += "<b>Catégories</b><br>"
-    for cat, col in CATEGORIES_COULEURS.items():
-        legende += f"<span style='color:{col}'>●</span> {cat}<br>"
+    # LayerControl : cases à cocher en haut à droite pour activer/désactiver chaque catégorie
+    folium.LayerControl(collapsed=False, position="topright").add_to(m)
+
+    # Légende fixe en bas à gauche (couleurs)
+    legende = "<div style='position: fixed; bottom: 30px; left: 30px; background: white; padding: 10px; border: 1px solid #888; z-index: 9999; font-size: 12px; max-width: 220px;'>"
+    legende += "<b>Couleurs par catégorie</b><br>"
+    for cat in cats_uniques:
+        col = CATEGORIES_COULEURS.get(cat, "gray")
+        legende += f"<span style='color:{col}; font-size: 18px;'>●</span> {cat}<br>"
+    legende += "<hr style='margin: 5px 0'><i>Filtre par catégorie en haut à droite ↗</i>"
     legende += "</div>"
     m.get_root().html.add_child(folium.Element(legende))
     m.save(path)
