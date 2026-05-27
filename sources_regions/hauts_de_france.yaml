@@ -2,6 +2,8 @@ region: "Hauts-de-France"
 departements: ["02", "59", "60", "62", "80"]
 sources:
   - nom: "saveurs_en_or"
-    description: "Saveurs en'Or — marque collective Hauts-de-France (~240 entreprises). ATTENTION : pagination JS dynamique, le scraping ne capte que la première vague."
+    description: "Saveurs en'Or — marque collective Hauts-de-France (~1000+ produits)"
     url: "https://saveursenor.fr/adherents/"
-    # Pas de config explicite → scraper auto
+  - nom: "terroirs_hauts_de_france"
+    description: "Terroirs Hauts-de-France — 600+ produits frais et transformés"
+    url: "https://terroirshautsdefrance.com/"

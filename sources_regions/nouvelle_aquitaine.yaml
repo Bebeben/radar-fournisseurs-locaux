@@ -1,9 +1,14 @@
 region: "Nouvelle-Aquitaine"
 departements: ["16", "17", "19", "23", "24", "33", "40", "47", "64", "79", "86", "87"]
 sources:
-  - nom: "produits_nouvelle_aquitaine"
-    description: "Produits de Nouvelle-Aquitaine — portail régional"
-    url: "https://www.produits-de-nouvelle-aquitaine.fr/producteurs/"
-  - nom: "produit_en_nouvelle_aquitaine"
-    description: "Produit en Nouvelle-Aquitaine — marque collective (AANA)"
-    url: "https://www.aana.fr/producteurs/"
+  - nom: "aria_nouvelle_aquitaine"
+    description: "Produit en Nouvelle-Aquitaine — marque collective (ARIA Nouvelle-Aquitaine)"
+    url: "https://www.aria-nouvelle-aquitaine.com/"
+  - nom: "saveurs_du_perigord"
+    description: "Saveurs du Périgord — marque départementale Dordogne (24), Chambre d'agri"
+    url: "https://dordogne.chambre-agriculture.fr/agriculture-produits/les-produits-du-perigord/les-marques-et-reseaux-labellises/saveurs-du-perigord/"
+    departements_specifiques: ["24"]
+  - nom: "idoki"
+    description: "IDOKI — charte fermière Pays Basque (64), 93 producteurs agréés sur 300 adhérents APFPB"
+    url: "https://www.producteurs-fermiers-pays-basque.fr/"
+    departements_specifiques: ["64"]

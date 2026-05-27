@@ -1,9 +1,7 @@
 region: "Bourgogne-Franche-Comté"
 departements: ["21", "25", "39", "58", "70", "71", "89", "90"]
+# Note : pas de marque ombrelle régionale food. Les AOP fromagères / vins font office.
 sources:
   - nom: "jveux_du_local_bfc"
-    description: "J'veux du local BFC — annuaire interactif Bourgogne-Franche-Comté"
-    url: "https://www.jveuxdulocalbfc.fr/producteurs/"
-  - nom: "savoir_faire_100_cote_dor"
-    description: "Savoir-Faire 100% Côte-d'Or — marque départementale (21 uniquement)"
-    url: "https://www.cotedor.fr/savoir-faire-100-cote-dor/producteurs"
+    description: "J'veux du local BFC — annuaire interactif (fermes, AMAP, magasins producteurs, marchés)"
+    url: "https://www.jveuxdulocalbfc.fr/"

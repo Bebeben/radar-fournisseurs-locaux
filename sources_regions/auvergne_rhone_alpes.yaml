@@ -2,5 +2,26 @@ region: "Auvergne-Rhône-Alpes"
 departements: ["01", "03", "07", "15", "26", "38", "42", "43", "63", "69", "73", "74"]
 sources:
   - nom: "ma_region_ses_terroirs"
-    description: "Ma Région Ses Terroirs — marque AURA (500+ entreprises, 4500+ produits)"
-    url: "https://www.maregionsesterroirs.fr/professionnels/producteurs/"
+    description: "Ma Région ses Terroirs — marque régionale AURA (500+ entreprises, 4500+ produits)"
+    url: "https://www.maregionsesterroirs.fr/"
+  - nom: "allier_bourbonnais_produits"
+    description: "Allier Bourbonnais Savoir-Faire — marque départementale (03)"
+    url: "https://savoir-faire.allier-bourbonnais.fr/les-producteurs-et-artisans-alimentaires/"
+    departements_specifiques: ["03"]
+  - nom: "goutez_lardeche"
+    description: "Goûtez l'Ardèche / Ardèche le Goût — marque départementale (07)"
+    url: "https://www.goutezlardeche.fr/"
+    departements_specifiques: ["07"]
+  - nom: "cantal_destination"
+    description: "Cantal Destination — marque départementale (15)"
+    url: "https://www.cantal-destination.com/"
+    departements_specifiques: ["15"]
+  # Is(H)ere (38) : URL officielle non trouvée — à ajouter via "Ajouter une source" si vous la trouvez
+  - nom: "monts_du_lyonnais"
+    description: "Monts du Lyonnais, Terre de Saveurs — marque locale (69), 140+ adhérents. NOTE: site uniquement en HTTP."
+    url: "http://le-lyonnais-drive.com/la-marque/"
+    departements_specifiques: ["69"]
+  - nom: "producteurs_savoie_mont_blanc"
+    description: "Producteurs Savoie Mont-Blanc — marque bi-départementale (73, 74)"
+    url: "https://www.producteurs-savoie-mont-blanc.com/"
+    departements_specifiques: ["73", "74"]

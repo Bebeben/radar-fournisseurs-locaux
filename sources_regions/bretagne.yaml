@@ -1,9 +1,6 @@
 region: "Bretagne"
-departements: ["22", "29", "35", "56"]
+departements: ["22", "29", "35", "44", "56"]   # 44 inclus historiquement par Produit en Bretagne
 sources:
-  - nom: "mangeons_local_bzh"
-    description: "Mangeons Local Bretagne — annuaire producteurs circuit court"
-    url: "https://www.mangeons-local.bzh/producteurs/"
   - nom: "produit_en_bretagne"
-    description: "Produit en Bretagne — 494 entreprises, marque collective bretonne"
-    url: "https://www.produitenbretagne.bzh/membres/"
+    description: "Produit en Bretagne — marque collective bretonne (494 entreprises, ~5500 produits)"
+    url: "https://www.produitenbretagne.bzh/nos-membres/"

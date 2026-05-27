@@ -1,0 +1,6 @@
+region: "La Réunion"
+departements: ["974"]
+sources:
+  - nom: "nou_la_fe"
+    description: "Nou la fé — marque collective ADIR (51 entreprises, 116 marques, 5000+ produits)"
+    url: "https://adir.re/nou-la-fe/"

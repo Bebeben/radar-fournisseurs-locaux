@@ -3,4 +3,12 @@ departements: ["09", "11", "12", "30", "31", "32", "34", "46", "48", "65", "66",
 sources:
   - nom: "sud_de_france"
     description: "Sud de France — marque régionale Occitanie (2 200 entreprises, ~16 000 produits)"
-    url: "https://sud-de-france.com/producteurs/"
+    url: "https://sud-de-france.com/les-adherents/"
+  - nom: "fabrique_en_aveyron"
+    description: "Fabriqué en Aveyron — marque départementale (12)"
+    url: "https://www.fabrique-en-aveyron.fr/"
+    departements_specifiques: ["12"]
+  - nom: "brin_de_ferme"
+    description: "Brin de Ferme — marque collective Tarn (81), 135 adhérents"
+    url: "https://brindeferme.fr/"
+    departements_specifiques: ["81"]

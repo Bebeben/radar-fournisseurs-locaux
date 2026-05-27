@@ -1,6 +1,0 @@
-region: "Corse"
-departements: ["2A", "2B"]
-sources:
-  - nom: "marque_corse"
-    description: "Marque Corse — produits du terroir corse"
-    url: "https://www.marquecorse.com/producteurs"

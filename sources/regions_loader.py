@@ -39,13 +39,21 @@ def charger_toutes_regions(dossier: Path | str = DEFAULT_DIR) -> list[dict]:
 
 
 def sources_pertinentes(regions: list[dict], departements_magasin: list[str]) -> list[dict]:
-    """Renvoie les définitions de sources dont les départements croisent ceux du magasin."""
+    """Renvoie les définitions de sources dont les départements croisent ceux du magasin.
+
+    Une source peut avoir un champ `departements_specifiques` qui restreint son
+    activation à un sous-ensemble. Si absent, elle s'active dès que la région est concernée.
+    """
     deps = set(departements_magasin)
     out = []
     for r in regions:
         deps_region = set(r.get("departements", []))
         if not deps_region or deps & deps_region:
             for src in r.get("sources", []):
+                # Filtrage département-spécifique (ex. marque départementale type Is(H)ere)
+                dep_spec = set(src.get("departements_specifiques", []) or [])
+                if dep_spec and not (deps & dep_spec):
+                    continue
                 src["_region"] = r.get("region", "")
                 out.append(src)
     return out

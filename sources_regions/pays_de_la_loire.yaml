@@ -1,6 +1,8 @@
 region: "Pays de la Loire"
 departements: ["44", "49", "53", "72", "85"]
+# Note : pas de marque ombrelle régionale food. Existent au niveau départemental / île.
 sources:
-  - nom: "terroir_pdl"
-    description: "Marché des Terroirs Pays de la Loire — annuaire producteurs"
-    url: "https://www.marchedesterroirs.fr/producteurs/"
+  - nom: "vendee_qualite"
+    description: "Vendée Qualité — marque départementale Vendée (85), produits sous IGP/LR. NOTE: site uniquement en HTTP."
+    url: "http://www.vendee-qualite.com/"
+    departements_specifiques: ["85"]
