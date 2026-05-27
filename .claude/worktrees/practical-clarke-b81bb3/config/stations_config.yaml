@@ -1,0 +1,181 @@
+# ============================================================
+# CONFIG STATIONS — Système de pilotage prix carburants
+# Station principale : Super U Les Pieux (Cotentin, 50340)
+# ============================================================
+#
+# Version : v2 (2026-04 — IDs renseignés depuis API publique data.economie.gouv.fr)
+#
+# Structure :
+#   - ma_station           : notre station
+#   - concurrent_principal : UN SEUL — alignement actif (cible 2 cts/L)
+#   - surveillance_rayon   : dans 15 km, monitoring seul, pas d'alignement auto
+#   - surveillance_zone    : hors rayon mais influence marché (Leclerc, autres U)
+#
+# Comment trouver l'ID d'une station :
+# 1. Aller sur https://www.prix-carburants.gouv.fr
+# 2. Taper le code postal ou le nom de la ville
+# 3. Cliquer sur la station dans la carte
+# 4. L'URL contient l'ID : .../stationservice/ID/infos
+#
+# Endpoint API utilisé pour valider :
+# https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/
+#   prix-des-carburants-en-france-flux-instantane-v2/records?where=cp%3D%22CPNUM%22
+# ============================================================
+
+# ------------------------------------------------------------
+# STATION PRINCIPALE
+# ------------------------------------------------------------
+ma_station:
+  nom: "Super U Les Pieux"
+  raison_sociale: "SUPER HAGUE SAS"
+  siren: "402654867"   # Conservé du fichier v1. SIRET 14 chiffres à compléter après cession.
+  adresse: "2 Route de Flamanville"   # Confirmé par Benjamin 2026-04-21
+  code_postal: "50340"
+  ville: "Les Pieux"
+  id_prix_carburants: "50340002"   # Validé via API + confirmation adresse Benjamin
+  coordonnees:
+    latitude: 49.512
+    longitude: -1.812
+  carburants_vendus:
+    - SP95-E10
+    - SP98
+    - Gazole
+  # Note : gamme confirmée via API (Gazole, E10, SP98). Ni SP95, ni E85, ni GPLc.
+  # Si ajout d'un carburant plus tard, mettre à jour ici.
+  horaires_pompe: "24h/24 automate CB"
+
+# ------------------------------------------------------------
+# CONCURRENT PRINCIPAL UNIQUE (alignement serré)
+# → Cible stratégique : aligner si baisse, marge cible 2 cts/L, plancher 1 ct/L
+# ------------------------------------------------------------
+concurrent_principal:
+  - nom: "Intermarché Les Pieux"
+    enseigne: "Intermarché"
+    id_prix_carburants: "50340003"   # Validé via API (26 route de Cherbourg)
+    adresse: "26 route de Cherbourg, Les Pieux"
+    coordonnees:
+      latitude: 49.51595
+      longitude: -1.80055
+    distance_km: 1.0
+    carburants: [SP95-E10, SP98, Gazole, E85]
+    priorite: haute
+    alignement_actif: true
+    note: >
+      Concurrent principal unique — proximité immédiate (~1 km).
+      Seule station sur laquelle alignement automatique est proposé.
+      Note : cet ITM propose en plus E85 (qu'on ne vend pas) ; l'alignement
+      porte uniquement sur les carburants communs (SP95-E10, SP98, Gazole).
+
+# ------------------------------------------------------------
+# SURVEILLANCE DANS LE RAYON 15 KM (monitoring, pas d'alignement)
+# → Signal marché, pas de proposition d'alignement automatique
+# ------------------------------------------------------------
+surveillance_rayon_15km:
+
+  - nom: "Station Pierreville"
+    enseigne: "Indépendant"
+    id_prix_carburants: "50340001"   # Validé via API
+    adresse: "9 Route des Isles, Pierreville"
+    distance_km: 5.0
+    carburants: [SP95-E10, SP98, Gazole]
+    alignement_actif: false
+    note: "Indépendante locale. Automate CB 24/24. Ignorer sauf si sous plancher (signal dumping)."
+
+  - nom: "Station Flamanville village"
+    enseigne: "Indépendant (gamme atypique pour un ITM — à confirmer terrain)"
+    id_prix_carburants: "50340006"   # Validé via API — gamme Gazole+SP95 uniquement
+    adresse: "40 Rue du Château, Flamanville"
+    distance_km: 5.2
+    carburants: [SP95, Gazole]
+    alignement_actif: false
+    note: >
+      Gamme très réduite (Gazole + SP95 seulement), atypique pour un supermarché.
+      Probablement une station indé de village. Monitoring pur.
+
+  - nom: "Carrefour Market Bricquebec"
+    enseigne: "Carrefour Market"
+    id_prix_carburants: "50260001"   # Candidat HAUTE CONFIANCE — gamme 5 carburants, ZC Bricquebec
+    adresse: "39 route de Valognes, Bricquebec-en-Cotentin"
+    distance_km: 13.9
+    carburants: [SP95, SP95-E10, SP98, Gazole, E85]
+    alignement_actif: false
+    note: "Surveillance zone. Pas concurrent direct Les Pieux mais signal marché Cotentin sud."
+
+  - nom: "Super U Bricquebec"
+    enseigne: "Super U"
+    id_prix_carburants: "A_COMPLETER_VERIFIER_TERRAIN"
+    # Deux candidats API à départager sur le terrain :
+    #   - 50260003 : 240 Rue Bitouzé d'Auxmesnil, Bricquebec (Gazole/E10/SP98)
+    #   - 50260004 : 41b Rue des Frères Frémine, Bricquebec (Gazole/E10/SP98)
+    # API ne renvoie pas l'enseigne. À confirmer via Google Maps ou appel réseau U.
+    adresse: "A_COMPLETER_VERIFIER_TERRAIN"
+    distance_km: 14
+    carburants: [SP95-E10, SP98, Gazole]
+    alignement_actif: false
+    note: "Autre Super U voisin. Surveillance pour cohérence réseau coopérative."
+
+# ------------------------------------------------------------
+# SURVEILLANCE ZONE ÉLARGIE (hors 15 km, mais influence marché)
+# → Jamais d'alignement, signal info uniquement
+# ------------------------------------------------------------
+surveillance_hors_rayon:
+
+  - nom: "Leclerc Querqueville"
+    enseigne: "E.Leclerc"
+    id_prix_carburants: "50460001"   # Validé via API — gamme 6 carburants complète
+    adresse: "5 rue des Claires, Cherbourg-en-Cotentin (Querqueville)"
+    distance_km: 19.5
+    carburants: [SP95, SP95-E10, SP98, Gazole, E85, GPLc]
+    alignement_actif: false
+    note: >
+      Leader prix bas du Cotentin. Hors rayon 15 km mais influence forte
+      sur la psychologie prix de la zone. Surveillance info uniquement.
+
+  - nom: "Super U Beaumont-Hague (La Hague)"
+    enseigne: "Super U"
+    id_prix_carburants: "50440002"   # Validé via API
+    adresse: "Parc Mairie Gardin, La Hague"
+    distance_km: 16.5
+    carburants: [SP95-E10, SP98, Gazole, E85]
+    alignement_actif: false
+    note: "Autre Super U proche. Surveillance cohérence coopérative U."
+
+# ------------------------------------------------------------
+# PARAMÈTRES DE RUN
+# ------------------------------------------------------------
+parametres:
+  rayon_concurrents_km: 15
+  # Strict : Valognes (~25 km), Cherbourg-Octeville (~18,6 km), Granville (~78 km)
+  # et station autoroute A84 ont été SORTIS du fichier (hors zone réelle).
+  # Leclerc Querqueville et Super U Beaumont-Hague gardés en "surveillance_hors_rayon"
+  # car influence marché, mais jamais d'alignement.
+
+  fenetre_horaire_debut: "07:00"
+  fenetre_horaire_fin: "13:00"   # Aligné sur cadence runs (7h / 10h / 13h)
+  jours_actifs: [lundi, mardi, mercredi, jeudi, vendredi, samedi]
+  weekend_actif: false
+  # Dimanche exclu (conforme strategie_tarifaire §4 et parametres_runs.yaml).
+
+# ------------------------------------------------------------
+# STATIONS RETIRÉES vs v1 (historique — ne pas remettre sans raison)
+# ------------------------------------------------------------
+# - Super U Valognes (~25 km)          : hors rayon, marché différent
+# - Super U Cherbourg-Octeville (~19km): hors rayon, marché urbain
+# - Hyper U Granville (~78 km)         : hors zone, sud-Manche
+# - Station autoroute A84 (~60 km)     : hors zone, pas d'interaction
+# Ces stations peuvent être réintégrées en V2 si extension du périmètre.
+
+# ------------------------------------------------------------
+# HISTORIQUE DES CORRECTIONS
+# ------------------------------------------------------------
+# 2026-04-21 : inversion corrigée entre Super U (50340002, 2 rte Flamanville)
+#              et Intermarché (50340003, 26 rte Cherbourg). Voir tasks/lessons.md.
+
+# ------------------------------------------------------------
+# ACTIONS D'HYGIÈNE À FAIRE PÉRIODIQUEMENT
+# ------------------------------------------------------------
+# - Vérifier mensuellement que les IDs sont toujours valides
+#   (fermetures définitives possibles dans le Cotentin)
+# - Ajouter une nouvelle station si ouverture dans le rayon
+# - Trancher "Super U Bricquebec" (A_COMPLETER_VERIFIER_TERRAIN) lors prise de fonction
+# - Confirmer SIRET complet SUPER HAGUE SAS après cession

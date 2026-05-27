@@ -1,0 +1,80 @@
+# ============================================================
+# PARAMÈTRES GMAIL — Système de pilotage prix carburants
+# ============================================================
+#
+# Ce fichier centralise toutes les configurations Gmail.
+# Version : v2 (2026-04 — placeholders différenciés)
+#
+# Deux niveaux de placeholder :
+#   - A_COMPLETER                  : rempli dès info dispo
+#   - A_COMPLETER_PRISE_FONCTION   : uniquement après prise de fonction effective
+# ============================================================
+
+destinataire:
+  email_principal: "A_COMPLETER_PRISE_FONCTION"
+  # Adresse email où Benjamin reçoit les alertes pricing
+  # Option transition : bgelats@gmail.com en attendant création email pro Les Pieux
+  # Choix Benjamin : attendre email pro définitif.
+
+  email_copie_optionnel: ""
+  # Optionnel : copie automatique (associé secondaire, comptable, etc.)
+  # Laisser vide si non utilisé
+
+expediteur:
+  email: "A_COMPLETER_PRISE_FONCTION"
+  # Adresse depuis laquelle Claude envoie les mails
+  # Doit être connectée via le connecteur Gmail Claude (claude.ai > Settings > Connectors)
+  # Peut être identique à destinataire (auto-envoi) ou différente
+
+  nom_affiche: "Pricing carburant Les Pieux"
+  # Nom affiché dans la boîte de réception du destinataire
+
+sujets:
+  prefixe_action: "[Pricing carburant] Proposition de repricing"
+  prefixe_info: "[INFO — pas d'action aujourd'hui]"
+  prefixe_post_livraison: "[Pricing carburant] Nouvelle livraison — repricing proposé"
+
+format:
+  inclure_lien_sheet: true
+  inclure_bloc_declaration_prix_carburants_gouv: true
+  inclure_lien_espace_gerant: true
+  url_espace_gerant: "https://www.prix-carburants.gouv.fr/oilstations/login"
+
+  signature: |
+    ---
+    Mail généré automatiquement par routine Claude Code
+    Cadence : 3 runs/jour (7h, 10h, 13h) du lundi au samedi
+    Configuration : strategie_tarifaire.md v1.1
+
+filtrage_factures_gmail:
+  libelle: "Factures/Carburant"
+  # Libellé Gmail dans lequel le système cherche les nouvelles factures.
+  # À créer manuellement dans Gmail + configurer un filtre auto :
+  #   De : (adresse fournisseur SIPLEC ou autre)
+  #   → Appliquer le libellé "Factures/Carburant"
+
+  expediteurs_attendus:
+    - "A_COMPLETER_PRISE_FONCTION"
+    # Fournisseur principal : SIPLEC (centrale carburants U).
+    # Adresse exacte à récupérer depuis une facture réelle post-cession.
+    # Ex. probable : factures@siplec.fr ou comptabilite@siplec.fr
+    - "A_COMPLETER_PRISE_FONCTION"
+    # Fournisseur secondaire éventuel (autre distributeur, transport carburants).
+  # Liste blanche des expéditeurs reconnus comme factures légitimes
+
+# ============================================================
+# HISTORIQUE DES MISES À JOUR
+# ============================================================
+# 2026-04-21 : différenciation A_COMPLETER vs A_COMPLETER_PRISE_FONCTION
+
+# ============================================================
+# CHECKLIST DE DÉPLOIEMENT (après prise de fonction)
+# ============================================================
+# 1. Créer adresse email pro Les Pieux
+# 2. Activer connecteur Gmail dans Claude (claude.ai > Settings > Connectors)
+# 3. Créer le libellé Gmail "Factures/Carburant"
+# 4. Configurer filtre auto pour les emails fournisseur carburant
+# 5. Récupérer l'adresse exacte d'expédition SIPLEC depuis première facture reçue
+# 6. Remplacer tous les "A_COMPLETER_PRISE_FONCTION" dans ce fichier
+# 7. Tester avec un run manuel en DRY_RUN=true : vérifier log de mail simulé
+# 8. Basculer DRY_RUN=false et tester avec un run réel

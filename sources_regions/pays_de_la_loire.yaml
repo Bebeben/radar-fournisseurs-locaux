@@ -1,0 +1,6 @@
+region: "Pays de la Loire"
+departements: ["44", "49", "53", "72", "85"]
+sources:
+  - nom: "terroir_pdl"
+    description: "Marché des Terroirs Pays de la Loire — annuaire producteurs"
+    url: "https://www.marchedesterroirs.fr/producteurs/"

@@ -1,0 +1,6 @@
+region: "Occitanie"
+departements: ["09", "11", "12", "30", "31", "32", "34", "46", "48", "65", "66", "81", "82"]
+sources:
+  - nom: "sud_de_france"
+    description: "Sud de France — marque régionale Occitanie (2 200 entreprises, ~16 000 produits)"
+    url: "https://sud-de-france.com/producteurs/"

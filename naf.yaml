@@ -1,0 +1,83 @@
+# Mapping catégorie -> codes NAF (APE)
+# Modifiable à la main. Les codes ici sont ceux remontés par l'API recherche-entreprises
+# sous le champ `activite_principale`.
+#
+# Logique : on cherche les TRANSFORMATEURS (10.xx, 11.xx) ET les FERMES en vente directe
+# (01.xx). Le filtrage anti-bruit (taille, holding) se fait dans radar.py.
+
+fromage_laitier:
+  - "10.51A"   # fabrication de lait liquide et produits frais
+  - "10.51B"   # beurre
+  - "10.51C"   # fromage
+  - "10.51D"   # autres produits laitiers
+  - "10.52Z"   # glaces et sorbets
+
+viande_charcuterie:
+  - "10.11Z"   # transformation et conservation viande de boucherie
+  - "10.12Z"   # transformation et conservation volaille
+  # 10.13A retiré : "préparation industrielle" = industriels, pas l'esprit producteur
+  - "10.13B"   # charcuterie artisanale
+
+# Boulangerie/pâtisserie volontairement RETIRÉE : ramène 200+ boulangeries de bourg
+# qui ne sont pas des fournisseurs Super U.
+# Si tu veux les remettre un jour, décommente :
+# boulangerie_patisserie:
+#   - "10.71C"   # boulangerie et boulangerie-pâtisserie
+#   - "10.71D"   # pâtisserie
+
+# Biscuiteries, chocolatiers, pâtes : ces transformateurs SONT des fournisseurs potentiels
+biscuiterie_chocolat_pates:
+  - "10.72Z"   # biscuits, biscottes, pâtisseries de conservation (biscuiteries artisanales)
+  - "10.73Z"   # pâtes alimentaires
+  - "10.82Z"   # cacao, chocolat, confiserie
+
+fruits_legumes_jus:
+  - "10.31Z"   # transformation et conservation pomme de terre
+  - "10.32Z"   # jus de fruits et légumes
+  - "10.39A"   # autres transformations conserves légumes
+  - "10.39B"   # autres transformations conserves fruits
+
+boissons_biere_cidre_vin:
+  - "11.01Z"   # distillation, rectification spiritueux
+  - "11.02A"   # fabrication vins effervescents
+  - "11.02B"   # vinification
+  - "11.03Z"   # fabrication cidre et autres vins de fruits
+  - "11.05Z"   # fabrication bière
+  - "11.07A"   # industrie eaux de table
+  - "11.07B"   # boissons rafraîchissantes
+
+epicerie_huile_sucre:
+  - "10.41A"   # huiles et graisses végétales brutes
+  - "10.41B"   # raffinage d'huiles et graisses
+  - "10.61A"   # meunerie
+  - "10.61B"   # autres activités du travail des grains
+  - "10.62Z"   # amidons et produits amylacés
+  - "10.81Z"   # sucre
+  - "10.83Z"   # transformation du thé et du café
+  - "10.84Z"   # condiments et assaisonnements
+  - "10.85Z"   # plats préparés
+  - "10.86Z"   # aliments diététiques et homogénéisés
+  - "10.89Z"   # autres produits alimentaires n.c.a. (inclut miel conditionné, œufs, etc.)
+
+agriculture_ferme:
+  - "01.11Z"   # céréales (sauf riz), légumineuses, oléagineux
+  - "01.13Z"   # culture légumes, melons, racines, tubercules
+  - "01.21Z"   # viticulture
+  - "01.24Z"   # fruits à pépins et à noyau
+  - "01.25Z"   # autres fruits d'arbres et arbustes (incl. baies)
+  - "01.28Z"   # plantes à parfum, aromatiques, médicinales et pharmaceutiques (SAFRAN, plantes médicinales, tisanes)
+  - "01.30Z"   # reproduction de plantes
+  - "01.41Z"   # élevage de vaches laitières
+  - "01.42Z"   # élevage d'autres bovins et buffles
+  - "01.45Z"   # élevage ovins et caprins
+  - "01.46Z"   # élevage porcins
+  - "01.47Z"   # élevage volailles
+  - "01.49Z"   # élevage d'autres animaux (INCLUT APICULTEURS = miel, ESCARGOTS, LAPINS)
+  - "01.50Z"   # culture et élevage associés (polyculture-élevage)
+
+aquaculture_poisson:
+  - "03.22Z"   # aquaculture en eau douce (FISHBRENNE, piscicultures)
+  - "10.20Z"   # transformation et conservation de poisson (conserveries type Reflets de Brenne)
+
+champignons_forestier:
+  - "02.30Z"   # récolte de produits forestiers non ligneux (champignons sauvages, baies, etc.)

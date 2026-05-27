@@ -1,0 +1,7 @@
+requests>=2.31
+beautifulsoup4>=4.12
+openpyxl>=3.1
+pandas>=2.1
+geopy>=2.4
+rapidfuzz>=3.5
+lxml>=4.9

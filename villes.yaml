@@ -1,0 +1,22 @@
+# Presets de magasins. Ajoute une entrée par magasin que tu veux radar-iser.
+# Le script va géocoder automatiquement si latitude/longitude absents.
+
+saint_benoit_du_sault:
+  nom: "Super U Saint-Benoît-du-Sault"
+  adresse: "Saint-Benoît-du-Sault, 36170"
+  latitude: 46.4375
+  longitude: 1.3892
+  rayon_km: 30
+  departements: ["36", "87", "23"]
+
+les_pieux:
+  nom: "Super U Les Pieux"
+  adresse: "Les Pieux, 50340"
+  rayon_km: 30
+  departements: ["50"]
+
+vaucresson:
+  nom: "Super U Vaucresson"
+  adresse: "Vaucresson, 92420"
+  rayon_km: 25
+  departements: ["92", "78", "75", "91"]

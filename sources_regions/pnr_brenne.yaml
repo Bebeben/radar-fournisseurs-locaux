@@ -1,0 +1,11 @@
+region: "PNR de la Brenne"
+departements: ["36"]
+sources:
+  - nom: "marque_parc_brenne"
+    description: "Marque Parc Naturel Régional de la Brenne — producteurs fermiers labellisés"
+    url: "https://www.parc-naturel-brenne.fr/sejournez/produits-locaux/producteurs-fermiers"
+    config:
+      selecteur_lien: "a[href*='/producteurs-fermiers/']"
+      selecteur_nom: "h3"
+      selecteur_commune: "p"
+      regex_commune: true

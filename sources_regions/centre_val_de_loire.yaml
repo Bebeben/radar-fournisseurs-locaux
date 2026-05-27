@@ -1,0 +1,9 @@
+region: "Centre-Val de Loire"
+departements: ["18", "28", "36", "37", "41", "45"]
+sources:
+  - nom: "cducentre"
+    description: "© du Centre — marque régionale Centre-Val de Loire (~240 producteurs)"
+    url: "https://www.cducentre.com/liste-adherents/"
+    config:
+      selecteur_lien: "a[href*='/adherents/']"
+      regex_commune: true

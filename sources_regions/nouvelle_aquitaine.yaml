@@ -1,0 +1,9 @@
+region: "Nouvelle-Aquitaine"
+departements: ["16", "17", "19", "23", "24", "33", "40", "47", "64", "79", "86", "87"]
+sources:
+  - nom: "produits_nouvelle_aquitaine"
+    description: "Produits de Nouvelle-Aquitaine — portail régional"
+    url: "https://www.produits-de-nouvelle-aquitaine.fr/producteurs/"
+  - nom: "produit_en_nouvelle_aquitaine"
+    description: "Produit en Nouvelle-Aquitaine — marque collective (AANA)"
+    url: "https://www.aana.fr/producteurs/"

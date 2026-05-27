@@ -1,0 +1,9 @@
+region: "Bretagne"
+departements: ["22", "29", "35", "56"]
+sources:
+  - nom: "mangeons_local_bzh"
+    description: "Mangeons Local Bretagne — annuaire producteurs circuit court"
+    url: "https://www.mangeons-local.bzh/producteurs/"
+  - nom: "produit_en_bretagne"
+    description: "Produit en Bretagne — 494 entreprises, marque collective bretonne"
+    url: "https://www.produitenbretagne.bzh/membres/"

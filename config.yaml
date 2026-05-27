@@ -1,0 +1,53 @@
+# Configuration par défaut pour radar.py / app.py
+# Pour basculer sur une autre ville, soit on remplace les valeurs ici,
+# soit on appelle radar.py --ville saint_benoit_du_sault (charge depuis villes.yaml)
+
+magasin:
+  preset: "saint_benoit_du_sault"   # clé dans villes.yaml ; null pour utiliser les champs ci-dessous
+  nom: "Super U Saint-Benoît-du-Sault"
+  adresse: "Saint-Benoît-du-Sault, 36170"
+  latitude: 46.4375
+  longitude: 1.3892
+
+rayon_km: 30
+departements: ["36", "87", "23"]
+
+categories:
+  fromage_laitier: true
+  viande_charcuterie: true
+  biscuiterie_chocolat_pates: true
+  fruits_legumes_jus: true
+  boissons_biere_cidre_vin: true
+  epicerie_huile_sucre: true
+  agriculture_ferme: true
+  aquaculture_poisson: true
+  champignons_forestier: true
+
+filtres:
+  exclure_grandes_entreprises: true
+  taille_max: "PME"
+  garder_uniquement_actifs: true
+  effectif_max_transfo: 20    # transformateurs (10.xx, 11.xx) : on coupe à 20 salariés pour rester sur l'artisanat
+  mode: "premium"             # "premium" = signaux vente directe requis ; "exhaustif" = tout garder
+  score_min_premium: 1        # en mode premium, on garde score >= ce seuil
+
+sources:
+  sirene: true                  # API recherche-entreprises (obligatoire en pratique)
+  agence_bio: true              # API Agence Bio
+  bienvenue_ferme: true         # scraping
+  cducentre: true               # scraping © du Centre
+  marque_parc_brenne: true      # scraping Parc Brenne
+  inao: true                    # CSV AOP/IGP
+
+enrichissement_google: false    # passe à true + GOOGLE_MAPS_API_KEY
+
+sortie:
+  dossier: "output"
+  excel: true
+  csv: true
+  carte_html: true
+  geojson: true
+
+cache:
+  dossier: "cache"
+  ttl_jours: 7

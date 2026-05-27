@@ -1,0 +1,61 @@
+# ============================================================
+# PARAMÈTRES DE RUNS — Système de pilotage prix carburants
+# ============================================================
+#
+# Ce fichier définit la cadence et les fenêtres d'exécution.
+# À ajuster sans toucher au code/prompt de la routine.
+# ============================================================
+
+cadence:
+  type: "scheduled_routine"   # Type de déclencheur Claude Code
+  fuseau_horaire: "Europe/Paris"
+
+  # Horaires des runs en heure locale Paris
+  horaires:
+    - "07:00"
+    - "10:00"
+    - "13:00"
+
+  # Jours actifs (lundi=1, dimanche=7)
+  jours_actifs:
+    - lundi
+    - mardi
+    - mercredi
+    - jeudi
+    - vendredi
+    - samedi
+
+  # Le dimanche est volontairement exclu :
+  # - Pas de changement de prix le dimanche
+  # - Aucun run, aucun mail
+  # - Évolution V2 possible : ajouter un run dimanche 18h en mode info pure
+
+regles_intra_journee:
+  verrou_apres_modification: true
+  # Si un prix a été modifié aujourd'hui, les runs suivants
+  # passent en mode "veille silencieuse" (pas de mail).
+  # Voir strategie_tarifaire.md §4.2.
+
+  exceptions_qui_envoient_mail_info:
+    - concurrent_sous_plancher
+    - trois_concurrents_baissent_simultanement
+    - autre_super_u_bouge_significativement
+
+post_livraison:
+  active: true
+  libelle_gmail_factures: "Factures/Carburant"
+  # Le système scanne ce libellé Gmail à chaque run.
+  # Si une nouvelle facture détectée :
+  # - Met à jour prix d'achat dans le Sheet
+  # - Recalcule marge actuelle
+  # - Propose repricing même si concurrents stables
+
+  seuil_ecart_significatif_cts: 0.3
+  # Différence de marge actuelle vs cible nécessitant proposition (en cts/L)
+
+# ============================================================
+# OBSERVATIONS / NOTES
+# ============================================================
+# - Plafond Pro : 5 runs/jour. On en utilise 3, marge confortable.
+# - Si bascule vers Max plus tard (15/jour), on pourrait densifier.
+# - Toute modification ici prend effet au run suivant.

@@ -1,0 +1,9 @@
+region: "Île-de-France"
+departements: ["75", "77", "78", "91", "92", "93", "94", "95"]
+sources:
+  - nom: "fermes_idf"
+    description: "Fermes d'Île-de-France — annuaire regroupant Mangeons local IdF + BAF + bio (~1300 producteurs)"
+    url: "https://www.fermesdiledefrance.fr/"
+  - nom: "mes_produits_locaux_idf"
+    description: "Mes Produits Locaux — carte interactive de la Région IdF"
+    url: "https://mesproduitslocaux.smartidf.services/"

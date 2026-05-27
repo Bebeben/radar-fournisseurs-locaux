@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.bienvenue-a-la-ferme.com)",
+      "Bash(/c/Users/bgela/AppData/Local/Programs/Python/Python312/python.exe -c ':*)",
+      "Bash(rm -f output/prospection_producteurs.xlsx)",
+      "Bash(\"/c/Users/bgela/AppData/Local/Programs/Python/Python312/python.exe\" main.py)",
+      "WebFetch(domain:www.coursesu.com)",
+      "WebFetch(domain:www.leclercdrive.fr)",
+      "WebFetch(domain:www.leclerc.com)",
+      "WebFetch(domain:www.e.leclerc)",
+      "WebFetch(domain:www.intermarche.com)",
+      "WebFetch(domain:locavor.fr)",
+      "Bash(\"C:\\\\Users\\\\bgela\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" main.py)"
+    ]
+  }
+}

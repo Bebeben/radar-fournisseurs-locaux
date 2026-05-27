@@ -1,0 +1,26 @@
+# Dépendances — pricing-carburants-les-pieux
+# Python 3.11+
+
+# HTTP (API prix-carburants.gouv.fr)
+requests>=2.31
+
+# Configs YAML
+PyYAML>=6.0
+
+# Google APIs (Gmail + Sheets)
+google-api-python-client>=2.100
+google-auth>=2.23
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2
+
+# Lecture du template xlsx (onglets Sheet)
+openpyxl>=3.1
+
+# Variables d'environnement (mode DRY_RUN, credentials paths)
+python-dotenv>=1.0
+
+# Génération visuel relevé concurrence (PNG envoyé via Telegram)
+matplotlib>=3.8
+
+# Tests
+pytest>=7.4

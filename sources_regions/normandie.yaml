@@ -1,0 +1,6 @@
+region: "Normandie"
+departements: ["14", "27", "50", "61", "76"]
+sources:
+  - nom: "saveurs_de_normandie"
+    description: "Saveurs de Normandie (ex-Gourmandie) — 130 entreprises, 600 produits"
+    url: "https://www.saveurs-de-normandie.fr/"

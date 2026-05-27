@@ -1,0 +1,77 @@
+{
+  "_commentaire": "Fixture simulant la réponse API data.economie.gouv.fr pour Super U Les Pieux (50340002) et concurrents directs. Utilisé quand MOCK_API=true.",
+  "results": [
+    {
+      "id": "50340002",
+      "adresse": "2 Route de Flamanville",
+      "ville": "Les Pieux",
+      "cp": "50340",
+      "latitude": 49.512,
+      "longitude": -1.812,
+      "gazole_prix": 1.669,
+      "gazole_maj": "2026-04-21T07:30:00+02:00",
+      "e10_prix": 1.679,
+      "e10_maj": "2026-04-21T07:30:00+02:00",
+      "sp98_prix": 1.769,
+      "sp98_maj": "2026-04-21T07:30:00+02:00"
+    },
+    {
+      "id": "50340003",
+      "adresse": "26 route de Cherbourg",
+      "ville": "Les Pieux",
+      "cp": "50340",
+      "latitude": 49.51595,
+      "longitude": -1.80055,
+      "gazole_prix": 1.659,
+      "gazole_maj": "2026-04-21T09:45:00+02:00",
+      "e10_prix": 1.679,
+      "e10_maj": "2026-04-21T09:45:00+02:00",
+      "sp98_prix": 1.769,
+      "sp98_maj": "2026-04-21T09:45:00+02:00",
+      "e85_prix": 0.899,
+      "e85_maj": "2026-04-21T09:45:00+02:00"
+    },
+    {
+      "id": "50340001",
+      "adresse": "9 Route des Isles",
+      "ville": "Pierreville",
+      "cp": "50340",
+      "latitude": 49.474,
+      "longitude": -1.787,
+      "gazole_prix": 1.689,
+      "gazole_maj": "2026-04-21T06:00:00+02:00",
+      "e10_prix": 1.699,
+      "e10_maj": "2026-04-21T06:00:00+02:00",
+      "sp98_prix": 1.789,
+      "sp98_maj": "2026-04-21T06:00:00+02:00"
+    },
+    {
+      "id": "50340006",
+      "adresse": "40 Rue du Chateau",
+      "ville": "Flamanville",
+      "cp": "50340",
+      "latitude": 49.533,
+      "longitude": -1.865,
+      "gazole_prix": 1.699,
+      "gazole_maj": "2026-04-20T15:00:00+02:00",
+      "sp95_prix": 1.759,
+      "sp95_maj": "2026-04-20T15:00:00+02:00"
+    },
+    {
+      "id": "50460001",
+      "adresse": "5 rue des Claires",
+      "ville": "Cherbourg-en-Cotentin",
+      "cp": "50460",
+      "latitude": 49.66,
+      "longitude": -1.686,
+      "gazole_prix": 1.639,
+      "gazole_maj": "2026-04-21T08:00:00+02:00",
+      "sp95_prix": 1.719,
+      "sp95_maj": "2026-04-21T08:00:00+02:00",
+      "e10_prix": 1.659,
+      "e10_maj": "2026-04-21T08:00:00+02:00",
+      "sp98_prix": 1.749,
+      "sp98_maj": "2026-04-21T08:00:00+02:00"
+    }
+  ]
+}

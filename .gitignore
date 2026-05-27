@@ -1,0 +1,17 @@
+# Cache local (pas la peine de pusher, sera reconstruit)
+cache/
+__pycache__/
+*.pyc
+
+# Outputs générés
+output/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets (s'il y en a un jour)
+.env
+.streamlit/secrets.toml

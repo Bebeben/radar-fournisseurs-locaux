@@ -1,0 +1,45 @@
+{
+  "_commentaire": "État mocké du Google Sheet 'Commande et prix station v2' pour tests dry-run.",
+  "pricing_live": {
+    "vente_ttc": {
+      "SP95-E10": 1.679,
+      "SP98": 1.769,
+      "Gazole": 1.669
+    },
+    "achat_ht": {
+      "SP95-E10": 1.3792,
+      "SP98": 1.4542,
+      "Gazole": 1.3708
+    },
+    "fournisseur_principal": "SIPLEC",
+    "derniere_maj": "2026-04-20T18:30:00+02:00"
+  },
+  "historique": [
+    {
+      "Date": "2026-04-20",
+      "Heure run": "07:00",
+      "Déclencheur": "Run 7h",
+      "Statut": "statu quo",
+      "Commentaire": "Aucun mouvement concurrent"
+    },
+    {
+      "Date": "2026-04-20",
+      "Heure run": "10:00",
+      "Déclencheur": "Run 10h",
+      "Statut": "statu quo",
+      "Commentaire": "Aucun mouvement concurrent"
+    },
+    {
+      "Date": "2026-04-20",
+      "Heure run": "13:00",
+      "Déclencheur": "Run 13h",
+      "Statut": "statu quo",
+      "Commentaire": "Aucun mouvement concurrent"
+    }
+  ],
+  "parametres": {
+    "marge_cible_cts": 2.0,
+    "plancher_cts": 1.0,
+    "tva_taux": 0.20
+  }
+}

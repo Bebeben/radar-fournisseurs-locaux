@@ -1,0 +1,7 @@
+region: "Hauts-de-France"
+departements: ["02", "59", "60", "62", "80"]
+sources:
+  - nom: "saveurs_en_or"
+    description: "Saveurs en'Or — marque collective Hauts-de-France (~240 entreprises). ATTENTION : pagination JS dynamique, le scraping ne capte que la première vague."
+    url: "https://saveursenor.fr/adherents/"
+    # Pas de config explicite → scraper auto

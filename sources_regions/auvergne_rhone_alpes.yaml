@@ -1,0 +1,6 @@
+region: "Auvergne-Rhône-Alpes"
+departements: ["01", "03", "07", "15", "26", "38", "42", "43", "63", "69", "73", "74"]
+sources:
+  - nom: "ma_region_ses_terroirs"
+    description: "Ma Région Ses Terroirs — marque AURA (500+ entreprises, 4500+ produits)"
+    url: "https://www.maregionsesterroirs.fr/professionnels/producteurs/"

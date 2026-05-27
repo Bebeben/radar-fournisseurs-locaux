@@ -1,0 +1,76 @@
+# ============================================================
+# PARAMÈTRES MAGASIN — Système de pilotage prix carburants
+# ============================================================
+#
+# Identité du magasin et infos administratives.
+# Version : v2 (2026-04 — adresse + SIREN renseignés)
+#
+# Deux niveaux de placeholder :
+#   - A_COMPLETER                  : pourrait être rempli maintenant, en attente d'info
+#   - A_COMPLETER_PRISE_FONCTION   : ne peut être rempli qu'après cession effective
+#                                    (acte signé, accès gérant, etc.)
+# ============================================================
+
+identite:
+  nom_commercial: "Super U Les Pieux"
+  raison_sociale: "SUPER HAGUE SAS"
+  siren: "402654867"   # SIREN conservé (confirmé par Benjamin 2026-04-21)
+  siret: "A_COMPLETER_PRISE_FONCTION"   # 14 chiffres = SIREN + NIC établissement. Après cession.
+  rcs: "Cherbourg-en-Cotentin"
+  associe_dirigeant: "Benjamin Gélats"   # En attente de prise de fonction
+
+adresse:
+  voie: "2 Route de Flamanville"   # Confirmé par Benjamin 2026-04-21
+  code_postal: "50340"
+  ville: "Les Pieux"
+  pays: "France"
+
+contact:
+  telephone_station: "A_COMPLETER_PRISE_FONCTION"
+  email_direction: "A_COMPLETER_PRISE_FONCTION"
+
+prix_carburants_gouv:
+  identifiant_station: "50340002"   # ID officiel confirmé via API + adresse
+  # Note : cet ID est aussi référencé dans stations_config.yaml (ma_station.id_prix_carburants)
+  # Les deux doivent rester synchronisés.
+
+  login_espace_gerant: "A_COMPLETER_PRISE_FONCTION"
+  # Login d'accès à l'interface de déclaration des prix
+  # NE JAMAIS stocker le mot de passe ici — saisie manuelle uniquement
+  # À récupérer par cession du compte ancien associé
+
+  declaration_obligatoire: true
+  # Obligation légale (arrêté ministériel du 12/12/2006) si volume vendu
+  # ≥ 500 m³/an pour SP95, SP95-E10, SP98, Gazole, E85 ou GPLC.
+  # Une station Super U dépasse ce seuil largement.
+
+ouverture:
+  station_24h: true
+  # Pompe automate CB ouverte 24h/24
+  # À confirmer pour Les Pieux après prise de possession
+
+  jours_fermeture_magasin:
+    - dimanche_apres_midi   # Si applicable
+
+google_drive:
+  dossier_pricing_id: "A_COMPLETER_PRISE_FONCTION"
+  # ID du dossier Drive contenant le Sheet de pricing
+
+  sheet_pricing_id: "A_COMPLETER_PRISE_FONCTION"
+  # ID du Google Sheet "Commande et prix station v2" converti en natif
+
+# ============================================================
+# HISTORIQUE DES MISES À JOUR
+# ============================================================
+# 2026-04-21 : adresse voie confirmée (2 rte de Flamanville), SIREN conservé,
+#              ID station officiel renseigné (50340002).
+
+# ============================================================
+# CHECKLIST DE DÉPLOIEMENT (après prise de fonction)
+# ============================================================
+# 1. Récupérer SIRET complet (14 chiffres) après signature acte de cession
+# 2. Récupérer login espace gérant prix-carburants.gouv.fr (cession compte ancien associé)
+# 3. Confirmer numéro de téléphone station
+# 4. Créer adresse email pro Les Pieux (email_direction)
+# 5. Convertir Sheet xlsx en Google Sheet natif et récupérer son ID
+# 6. Remplacer tous les "A_COMPLETER_PRISE_FONCTION" dans ce fichier

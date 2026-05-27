@@ -1,0 +1,6 @@
+region: "Grand Est"
+departements: ["08", "10", "51", "52", "54", "55", "57", "67", "68", "88"]
+sources:
+  - nom: "saveurs_paysannes_54"
+    description: "Saveurs Paysannes 54 — coopérative de producteurs Meurthe-et-Moselle (~70 membres)"
+    url: "https://saveurspaysannes54.fr/producteurs"
