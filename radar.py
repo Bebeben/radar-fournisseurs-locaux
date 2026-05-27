@@ -189,12 +189,12 @@ def calculer_score(p: dict) -> tuple[int, list[str]]:
     tranche = p.get("tranche_effectif", "")
     if tranche in ("00", "01", "02", "03"):
         score += 1; detail.append("Petite taille (≤9 sal.) +1")
-    # +1 par source de candidats label dans la commune (signal de présence sur un site label)
-    candidats = p.get("candidats_labels", {}) or {}
-    for src, items in candidats.items():
-        if items:
+    # +1 par label matché (présence confirmée sur un site label, avec lien dans le popup)
+    for k in p:
+        if isinstance(k, str) and k.startswith("label_") and p.get(k):
+            nom_l = k.replace("label_", "").replace("_", " ")
             score += 1
-            detail.append(f"{src} +1")
+            detail.append(f"{nom_l} +1")
     return score, detail
 
 
@@ -253,56 +253,79 @@ def _noms_alternatifs(nom: str) -> list[str]:
     return [v for v in variantes if v and len(v) >= 4]
 
 
-def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dict], cle_label: str) -> None:
+def _tokens_significatifs(nom_normalise: str) -> set[str]:
+    """Renvoie les tokens significatifs d'un nom (mots ≥ 4 caractères, hors mots communs)."""
+    mots_communs = {"ferme", "domaine", "maison", "gaec", "earl", "sarl", "scea", "ei",
+                    "saint", "sainte", "saintes", "saints"}
+    return {t for t in nom_normalise.split() if len(t) >= 4 and t not in mots_communs}
+
+
+def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dict], cle_label: str) -> int:
     """Tag les producteurs SIRENE qui correspondent à un item label.
 
-    Règles anti-faux-positifs :
-    - Match SIRET → 100 % sûr, tag.
-    - Sinon match nom (token_set_ratio) :
-        - Si MÊME COMMUNE entre SIRENE et label → seuil 88 (laxiste sur orthographe nom)
-        - Si commune différente ou inconnue → seuil 95 (très strict)
-    - Normalisation : retrait des préfixes (GAEC, EARL, SARL...) + civilités (Mr, Mme...)
-    - Noms < 4 caractères ignorés (faux positifs trop probables)
-    """
-    SEUIL_MEME_COMMUNE = 95      # ↑ de 88 — quasi-exact (orthographe tolérée mais pas plus)
-    SEUIL_COMMUNE_DIFF = 100     # commune différente → exigence d'un match exact (sauf SIRET)
+    Règle stricte (anti-faux-positifs) : on tag UN producteur SIRENE pour UN item label,
+    et seulement si une de ces conditions est vraie :
+      - Match SIRET (sûr à 100%)
+      - Même commune ET ≥ 1 token significatif commun ET fuzz token_set_ratio ≥ 70
+      - Fuzz token_set_ratio ≥ 95 (match quasi-exact même sans commune)
 
+    "Token significatif" = mot ≥ 4 chars, hors mots communs (Ferme, GAEC, Saint...).
+    Ex : "Maison Apicole Oizon" (label) vs "OIZON HERVE" (SIRENE) → token commun "oizon"
+         + même commune → match.
+    Renvoie le nombre de tags appliqués.
+    """
+    n_tag = 0
     for item in items_label:
-        nom_l = _normaliser_nom(item.get("nom") or "")
+        nom_l_raw = item.get("nom") or ""
+        nom_l = _normaliser_nom(nom_l_raw)
         commune_l = (item.get("commune") or "").lower().strip()
         siret_l = (item.get("siret") or "")
         if not nom_l or len(nom_l) < 4:
             continue
+        tokens_l = _tokens_significatifs(nom_l)
 
-        best_idx, best_score, best_meme_commune = -1, 0, False
         for i, p in enumerate(producteurs):
-            # Match SIRET = sûr et définitif
             if siret_l and p.get("siret") == siret_l:
-                best_idx, best_score, best_meme_commune = i, 100, True
+                # Match SIRET définitif
+                _appliquer_tag(p, cle_label, item)
+                n_tag += 1
                 break
-            commune_p = (p.get("commune") or "").lower().strip()
-            meme_commune = bool(commune_l and commune_p and commune_l == commune_p)
-            variantes = _noms_alternatifs(p.get("nom_complet") or "")
-            for variante in variantes:
-                if len(variante) < 4:
-                    continue
-                score = fuzz.token_set_ratio(nom_l, variante)
-                # On prend le meilleur score, en mémorisant si la commune correspond
-                if score > best_score or (score == best_score and meme_commune and not best_meme_commune):
-                    best_idx, best_score, best_meme_commune = i, score, meme_commune
+        else:
+            # Pas de match SIRET — fallback nom + commune
+            best_idx, best_score = -1, 0
+            for i, p in enumerate(producteurs):
+                commune_p = (p.get("commune") or "").lower().strip()
+                meme_commune = bool(commune_l and commune_p and commune_l == commune_p)
 
-        # Décision finale
-        if best_idx < 0:
-            continue
-        seuil_applicable = SEUIL_MEME_COMMUNE if best_meme_commune else SEUIL_COMMUNE_DIFF
-        if best_score < seuil_applicable:
-            continue
-        producteurs[best_idx][cle_label] = True
-        url_fiche = item.get("url_fiche")
-        if url_fiche:
-            producteurs[best_idx][f"url_{cle_label}"] = url_fiche
-        # On stocke aussi le nom scrapé côté label pour vérification visuelle
-        producteurs[best_idx][f"nom_label_{cle_label.replace('label_', '')}"] = item.get("nom", "")
+                variantes = _noms_alternatifs(p.get("nom_complet") or "")
+                for variante in variantes:
+                    if len(variante) < 4:
+                        continue
+                    tokens_p = _tokens_significatifs(_normaliser_nom(variante))
+                    score = fuzz.token_set_ratio(nom_l, _normaliser_nom(variante))
+
+                    # Critère strict
+                    accepte = False
+                    if score >= 95:
+                        accepte = True  # match quasi-exact
+                    elif meme_commune and score >= 70 and (tokens_l & tokens_p):
+                        accepte = True  # même commune + token distinctif commun
+
+                    if accepte and score > best_score:
+                        best_idx, best_score = i, score
+
+            if best_idx >= 0:
+                _appliquer_tag(producteurs[best_idx], cle_label, item)
+                n_tag += 1
+    return n_tag
+
+
+def _appliquer_tag(producteur: dict, cle_label: str, item: dict) -> None:
+    """Applique le tag label + l'URL + le nom scrapé sur un producteur."""
+    producteur[cle_label] = True
+    if item.get("url_fiche"):
+        producteur[f"url_{cle_label}"] = item["url_fiche"]
+    producteur[f"nom_label_{cle_label.replace('label_', '')}"] = item.get("nom", "")
 
 
 def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: list[dict],
@@ -496,33 +519,16 @@ def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.Da
     if sources_actives.get("regionales", True):
         try:
             par_source = labels.sources_regionales(deps, cache_dir, ttl, verbose=verbose)
-            # Indexer chaque source par commune (clé = commune en minuscule)
-            from collections import defaultdict as _dd
             for nom_source, items in par_source.items():
-                index_commune = _dd(list)
-                for it in items:
-                    com = (it.get("commune") or "").strip().lower()
-                    if com:
-                        index_commune[com].append(it)
-                # Pour chaque producteur, lister les candidats dans sa commune
-                for p in producteurs:
-                    com_p = (p.get("commune") or "").strip().lower()
-                    if not com_p:
-                        continue
-                    cands = index_commune.get(com_p) or []
-                    if cands:
-                        p.setdefault("candidats_labels", {})[nom_source] = [
-                            {"nom": c.get("nom", ""),
-                             "url_fiche": c.get("url_fiche", ""),
-                             "code_postal": c.get("code_postal", "")}
-                            for c in cands[:5]  # limite à 5 candidats par source
-                        ]
-                # Ajouter les orphelins : items label dont la commune est dans le rayon
-                # mais qui n'apparaissent pas du tout côté SIRENE
+                cle_label = f"label_{nom_source}"
+                # Matching strict : un item label se rattache à UN producteur SIRENE max,
+                # par SIRET (fiable) ou par même commune + tokens distinctifs communs
+                n_tag = matcher_label_sur_producteurs(producteurs, items, cle_label)
+                # Items qui n'ont pas matché → ajoutés en orphelins si dans le rayon
                 n_orph = ajouter_producteurs_label_orphelins(
-                    producteurs, items, f"label_{nom_source}", lat, lon, rayon
+                    producteurs, items, cle_label, lat, lon, rayon
                 )
-                _log(f"[{nom_source}] {len(items)} items scrapés, {n_orph} orphelins ajoutés")
+                _log(f"[{nom_source}] {len(items)} items : {n_tag} tagués sur SIRENE, {n_orph} orphelins ajoutés")
         except Exception as e:
             _log(f"[regions] erreur: {e}")
 
@@ -637,29 +643,19 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
         groupes_par_cat[cat] = cluster_cat
         m.add_child(fg)
 
-    # FeatureGroup additionnels par "présence de candidats label" :
-    # un sous-groupe désactivable par source (ex. "© du Centre — 12 producteurs avec candidat")
-    # Pas une catégorie mais un filtre supplémentaire — coché par défaut.
-    sources_labels_dispo = set()
-    for _, r_ in df.iterrows():
-        cands = r_.get("candidats_labels") if isinstance(r_, dict) else None
-        if not isinstance(cands, dict):
-            try:
-                cands = r_.get("candidats_labels", None)
-            except Exception:
-                cands = None
-        if isinstance(cands, dict):
-            sources_labels_dispo.update(cands.keys())
+    # FeatureGroup additionnels par label matché.
+    # Un producteur peut avoir plusieurs labels → il apparaîtra dans plusieurs FG.
+    cols_labels = sorted(set(
+        c for c in df.columns if isinstance(c, str) and c.startswith("label_")
+    ))
     groupes_par_label = {}
-    for src in sorted(sources_labels_dispo):
-        n_label = sum(
-            1 for _, r_ in df.iterrows()
-            if isinstance(r_.get("candidats_labels"), dict) and r_.get("candidats_labels", {}).get(src)
-        )
+    for col in cols_labels:
+        n_label = int(df[col].fillna(False).astype(bool).sum())
         if n_label == 0:
             continue
-        fg = folium.FeatureGroup(name=f"📍 Candidat {src} ({n_label})", show=False)
-        groupes_par_label[src] = fg
+        nom_lbl = col.replace("label_", "").replace("_", " ")
+        fg = folium.FeatureGroup(name=f"🏷 {nom_lbl} ({n_label})", show=False)
+        groupes_par_label[col] = fg
         m.add_child(fg)
 
     for _, r in df.iterrows():
@@ -678,24 +674,17 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
         if r.get("est_entrepreneur_individuel"): flags_sirene.append("EI")
         flags_sirene_str = " · ".join(flags_sirene) if flags_sirene else "—"
 
-        # Candidats label : pour chaque source qui a un item dans la commune du producteur,
-        # on affiche le lien vers la fiche correspondante (à vérifier par l'utilisateur).
-        candidats = r.get("candidats_labels") or {}
-        cand_html_blocks = []
-        if isinstance(candidats, dict):
-            for source, items in candidats.items():
-                if not items:
-                    continue
-                liens = []
-                for c in items:
-                    url = c.get("url_fiche") or ""
-                    nom = c.get("nom") or "(sans nom)"
-                    if url:
-                        liens.append(f"<a href='{url}' target='_blank'>{nom}</a>")
-                    else:
-                        liens.append(nom)
-                cand_html_blocks.append(f"<b>{source}</b> : " + ", ".join(liens))
-        cand_str = "<br>".join(cand_html_blocks) if cand_html_blocks else "<i>aucun candidat dans cette commune</i>"
+        # Labels matchés (uniquement ceux qu'on a vraiment liés à ce producteur)
+        labels_matches = []
+        cols = list(r.index) if hasattr(r, "index") else list(r.keys())
+        for col in cols:
+            if isinstance(col, str) and col.startswith("label_") and r.get(col):
+                nom_lbl = col.replace("label_", "").replace("_", " ")
+                url = r.get(f"url_{col}", "")
+                nom_scrape = r.get(f"nom_label_{col.replace('label_', '')}", "")
+                lien = f"<a href='{url}' target='_blank'>{nom_scrape or nom_lbl}</a>" if url else (nom_scrape or nom_lbl)
+                labels_matches.append(f"<b>{nom_lbl}</b> : {lien}")
+        cand_str = "<br>".join(labels_matches) if labels_matches else "<i>aucun label matché</i>"
         site = r.get("site_web", "")
         tel = r.get("telephone", "")
         annuaire = r.get("fiche_annuaire", "")
@@ -717,7 +706,7 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
             + (f"{contact_str}<br>" if contact_str else "")
             + f"NAF : {r.get('code_naf','')} {r.get('libelle_naf','')}<br>"
             f"Signaux SIRENE : {flags_sirene_str}<br>"
-            f"<b>Candidats label dans cette commune (à vérifier) :</b><br>{cand_str}<br>"
+            f"<b>Labels matchés :</b><br>{cand_str}<br>"
             f"Dirigeant : {r.get('dirigeant_principal','')}<br>"
             f"<b>Score : {r.get('score_pertinence',0)}</b> "
             f"<span style='color:#888; font-size:11px'>({detail_score})</span>"
@@ -727,16 +716,13 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
             target = m
         folium.Marker([lat, lon], popup=folium.Popup(popup, max_width=400),
                       icon=folium.Icon(color=couleur, icon="leaf", prefix="fa")).add_to(target)
-        # Duplique le marqueur dans les FG label correspondants (filtrage par label)
-        cands_r = r.get("candidats_labels") if isinstance(r.get("candidats_labels"), dict) else {}
-        for src in cands_r:
-            if cands_r.get(src):
-                fg_label = groupes_par_label.get(src)
-                if fg_label is not None:
-                    folium.Marker(
-                        [lat, lon], popup=folium.Popup(popup, max_width=400),
-                        icon=folium.Icon(color="black", icon="bookmark", prefix="fa"),
-                    ).add_to(fg_label)
+        # Duplique le marqueur dans les FG des labels matchés
+        for col, fg_label in groupes_par_label.items():
+            if r.get(col):
+                folium.Marker(
+                    [lat, lon], popup=folium.Popup(popup, max_width=400),
+                    icon=folium.Icon(color="black", icon="bookmark", prefix="fa"),
+                ).add_to(fg_label)
 
     # LayerControl : cases à cocher en haut à droite pour activer/désactiver chaque catégorie
     folium.LayerControl(collapsed=False, position="topright").add_to(m)
