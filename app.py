@@ -24,8 +24,10 @@ import radar
 # --------- Helper : auto-détection des départements dans un rayon ----------
 
 @st.cache_data
-def charger_dpt_geo() -> dict:
-    return yaml.safe_load(open(ROOT / "departements_geo.yaml", "r", encoding="utf-8")) if (ROOT / "departements_geo.yaml").exists() else {}
+def charger_dpt_bbox() -> dict:
+    """Charge les bounding boxes des départements (lat_min, lon_min, lat_max, lon_max)."""
+    p = ROOT / "departements_bbox.yaml"
+    return yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {}
 
 
 def _haversine(lat1, lon1, lat2, lon2) -> float:
@@ -35,19 +37,31 @@ def _haversine(lat1, lon1, lat2, lon2) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def departements_dans_rayon(lat: float, lon: float, rayon_km: float, marge_km: float = 80) -> list[str]:
-    """Renvoie les codes département dont la préfecture est à <= rayon+marge du point.
-    Marge généreuse (80 km par défaut) pour capturer les départements voisins même grands.
+def _distance_point_bbox(lat: float, lon: float, bbox: list[float]) -> float:
+    """Distance minimale (km) entre un point et un rectangle bbox [lat_min, lon_min, lat_max, lon_max].
+    Si le point est DANS la bbox, renvoie 0.
+    Sinon, projette le point sur le côté le plus proche du rectangle et calcule haversine.
     """
-    geo = charger_dpt_geo()
-    if not geo:
+    lat_min, lon_min, lat_max, lon_max = bbox
+    closest_lat = max(lat_min, min(lat, lat_max))
+    closest_lon = max(lon_min, min(lon, lon_max))
+    return _haversine(lat, lon, closest_lat, closest_lon)
+
+
+def departements_dans_rayon(lat: float, lon: float, rayon_km: float, marge_km: float = 0) -> list[str]:
+    """Renvoie les codes département dont la frontière est à <= rayon_km du point magasin.
+    Utilise les bounding boxes (rectangles englobants) pour une détection précise — plus de marge bidon.
+    Le paramètre marge_km existe pour compat mais devrait être 0 dans le nouveau mode.
+    """
+    bboxes = charger_dpt_bbox()
+    if not bboxes:
         return []
     seuil = rayon_km + marge_km
     out = []
-    for code, coords in geo.items():
-        if not coords or len(coords) < 2:
+    for code, bbox in bboxes.items():
+        if not bbox or len(bbox) != 4:
             continue
-        d = _haversine(lat, lon, coords[0], coords[1])
+        d = _distance_point_bbox(lat, lon, bbox)
         if d <= seuil:
             out.append((code, d))
     out.sort(key=lambda x: x[1])
@@ -220,11 +234,12 @@ with st.sidebar:
         nom_default = st.session_state.pop("_preset_nom", "") or f"Super U {ville_choisie['city']}"
         if ville_choisie.get("lat") and ville_choisie.get("lon"):
             deps_auto = departements_dans_rayon(
-                ville_choisie["lat"], ville_choisie["lon"], rayon, marge_km=80,
+                ville_choisie["lat"], ville_choisie["lon"], rayon,
             )
         deps_default = ",".join(deps_auto) if deps_auto else ville_choisie["departement"]
         st.caption(
-            f"📍 **{ville_choisie['city']}** ({ville_choisie['postcode']}) — dpt {ville_choisie['departement']}"
+            f"📍 **{ville_choisie['city']}** ({ville_choisie['postcode']}) — dpt {ville_choisie['departement']} "
+            f"· {len(deps_auto)} département(s) à interroger pour un rayon de {rayon} km"
         )
         nom = st.text_input("Libellé magasin", nom_default,
                               help="Apparaît sur la carte et dans le nom de fichier export. "
@@ -235,8 +250,8 @@ with st.sidebar:
     deps_input = st.text_input(
         "Départements à interroger",
         deps_default,
-        help="Pré-rempli avec les départements dont la préfecture est dans "
-             "ton rayon + 80 km. Tu peux modifier la liste si besoin.",
+        help="Détection précise par bounding box : tous les départements dont au moins "
+             "une partie est dans ton rayon. Tu peux modifier la liste si besoin.",
     )
 
     # ----- Sauvegarder ce magasin comme preset -----
