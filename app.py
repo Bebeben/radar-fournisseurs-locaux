@@ -15,8 +15,44 @@ from pathlib import Path
 import streamlit as st
 import yaml
 import pandas as pd
+import requests
 
 import radar
+
+
+# --------- Helper : autocomplete ville ----------
+
+@st.cache_data(ttl=3600)
+def chercher_communes(query: str) -> list[dict]:
+    """Appelle api-adresse.data.gouv.fr pour suggérer des communes (autocomplete)."""
+    if not query or len(query) < 2:
+        return []
+    try:
+        r = requests.get(
+            "https://api-adresse.data.gouv.fr/search/",
+            params={"q": query, "type": "municipality", "limit": 8},
+            timeout=5,
+        )
+        if r.status_code != 200:
+            return []
+        feats = (r.json() or {}).get("features") or []
+        out = []
+        for f in feats:
+            p = f.get("properties", {})
+            g = f.get("geometry", {}).get("coordinates", [None, None])
+            out.append({
+                "label": f"{p.get('city', '?')} ({p.get('postcode', '?')}) — {p.get('context', '')}",
+                "city": p.get("city", ""),
+                "postcode": p.get("postcode", ""),
+                "citycode": p.get("citycode", ""),
+                "departement": (p.get("citycode") or "")[:2] if (p.get("citycode") or "").startswith("97") is False else (p.get("citycode") or "")[:3],
+                "context": p.get("context", ""),
+                "lat": g[1] if g and len(g) >= 2 else None,
+                "lon": g[0] if g and len(g) >= 2 else None,
+            })
+        return out
+    except Exception:
+        return []
 
 
 # --------------- Chargement config par défaut ----------------
@@ -62,30 +98,49 @@ villes = charger_villes()
 # --------- Sidebar : paramètres magasin ----------
 with st.sidebar:
     st.header("Magasin")
-    # Saisie libre par défaut. Bouton dépliable pour charger un preset.
-    nom = st.text_input("Nom du magasin", "Super U Saint-Benoît-du-Sault")
-    adresse = st.text_input("Adresse (sera géocodée automatiquement)",
-                             "Saint-Benoît-du-Sault, 36170")
-    rayon = st.slider("Rayon (km)", 5, 100, 30)
-    deps_input = st.text_input("Départements (codes séparés par virgule)", "36,87,23",
-                                help="Met les départements qui couvrent ton rayon, même partiellement.")
+    nom = st.text_input("Nom du magasin (libre)", "Super U Saint-Benoît-du-Sault")
 
-    with st.expander("Charger un preset ville"):
+    # Autocomplete ville via API Adresse
+    st.caption("Tape un nom de commune (≥ 2 lettres) :")
+    query = st.text_input("Recherche commune", "Saint-Benoît-du-Sault", key="ville_search")
+    suggestions = chercher_communes(query)
+
+    if suggestions:
+        labels_suggest = [s["label"] for s in suggestions]
+        choix_idx = st.selectbox("Choisir la bonne commune",
+                                  options=list(range(len(suggestions))),
+                                  format_func=lambda i: labels_suggest[i],
+                                  index=0,
+                                  key="ville_choix")
+        ville_choisie = suggestions[choix_idx]
+        adresse = f"{ville_choisie['city']}, {ville_choisie['postcode']}"
+        st.success(f"Sélectionnée : **{ville_choisie['city']}** ({ville_choisie['postcode']}) "
+                   f"— dpt {ville_choisie['departement']}")
+        # Pré-remplir les départements à partir du département de la ville
+        dpt_principal = ville_choisie["departement"]
+        deps_default = dpt_principal
+    else:
+        adresse = query if query else "Saint-Benoît-du-Sault, 36170"
+        dpt_principal = ""
+        deps_default = "36,87,23"
+        if query and len(query) >= 2:
+            st.warning("Aucune commune trouvée. Tape les premières lettres du nom officiel.")
+
+    rayon = st.slider("Rayon (km)", 5, 100, 30)
+    deps_input = st.text_input(
+        "Départements à interroger (codes séparés par virgule)",
+        deps_default,
+        help="Pré-rempli avec le département de la commune. Ajoute les départements voisins "
+             "si ton rayon déborde dessus (séparés par virgule). Ex : '36,87,23' pour St-Benoît.",
+    )
+
+    with st.expander("Charger un preset (Saint-Benoît, Les Pieux, Vaucresson...)"):
         if villes:
             preset = st.selectbox("Preset", ["(aucun)"] + list(villes.keys()))
-            if preset != "(aucun)" and st.button("Appliquer ce preset"):
+            if preset != "(aucun)" and st.button("Appliquer"):
                 v = villes[preset]
-                st.session_state["_preset_nom"] = v.get("nom", "")
-                st.session_state["_preset_adresse"] = v.get("adresse", "")
-                st.session_state["_preset_rayon"] = v.get("rayon_km", 30)
-                st.session_state["_preset_deps"] = ",".join(v.get("departements", []))
+                st.session_state["ville_search"] = v.get("adresse", "").split(",")[0]
                 st.rerun()
-        # Récupère les valeurs du preset si on vient de cliquer
-        if "_preset_nom" in st.session_state:
-            nom = st.session_state.pop("_preset_nom")
-            adresse = st.session_state.pop("_preset_adresse")
-            rayon = st.session_state.pop("_preset_rayon")
-            deps_input = st.session_state.pop("_preset_deps")
 
     st.header("Catégories")
     st.caption("Cases cochées = groupes de codes NAF prédéfinis dans `naf.yaml`.")
@@ -207,13 +262,21 @@ if run_clicked:
     if "_individuels" in naf_effectif:
         cats_actives["_individuels"] = True
 
-    status = st.status("Interrogation des sources... (regarde aussi le terminal PowerShell pour le détail)", expanded=True)
+    status = st.status("Interrogation des sources en cours...", expanded=True)
+    # Liste pour accumuler les logs et les afficher dans le status
+    logs_progression: list[str] = []
+    log_placeholder = status.empty()
+
+    def log_cb(msg: str):
+        logs_progression.append(msg)
+        # Affiche les 20 dernières lignes pour ne pas saturer
+        log_placeholder.code("\n".join(logs_progression[-20:]), language="text")
+
     try:
         with status:
-            st.write("Géocodage + appels SIRENE (60 codes NAF × départements)... ~1-2 min")
-            st.write("Puis scraping labels (Agence Bio, BAF, © du Centre, Brenne, INAO)... ~1-2 min")
-            st.write("Au 2e run sur la même config, le cache rend ça quasi-instantané.")
-            df = radar.run(config, naf_effectif, verbose=True)
+            st.write("Géocodage + SIRENE (50+ codes NAF × départements) + scraping labels régionaux.")
+            st.write("Premier run : 2-4 min. Runs suivants : quelques secondes (cache).")
+            df = radar.run(config, naf_effectif, verbose=False, log_cb=log_cb)
         status.update(label=f"Run terminé : {len(df)} producteurs", state="complete")
     except Exception as e:
         status.update(label="Erreur", state="error")

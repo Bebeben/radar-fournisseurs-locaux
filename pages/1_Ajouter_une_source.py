@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from sources import scraper_generique, regions_loader  # noqa: E402
 
-st.set_page_config(page_title="Ajouter une source", layout="wide")
+# set_page_config est défini dans app.py (page principale) — pas besoin de le refaire ici
 st.title("Ajouter / Tester une source de producteurs")
 
 st.caption("""

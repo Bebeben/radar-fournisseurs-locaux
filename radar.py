@@ -274,7 +274,15 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
 # Pipeline principal
 # ====================================================================
 
-def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
+def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.DataFrame:
+    """Pipeline principal. Si log_cb est fourni, c'est une fonction appelée pour chaque
+    message de progression (au lieu d'un print stdout). Permet d'afficher la progression
+    dans Streamlit Cloud où le terminal n'est pas visible côté utilisateur."""
+    def _log(msg: str):
+        if log_cb:
+            log_cb(msg)
+        elif verbose:
+            print(msg, flush=True)
     mag = config["magasin"]
     rayon = config.get("rayon_km", 30)
     deps = config.get("departements", [])
@@ -288,14 +296,14 @@ def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
     lon = mag.get("longitude")
     if not (lat and lon):
         if verbose:
-            print(f"[geocode] {mag.get('adresse','')}")
+            _log(f"[geocode] {mag.get('adresse','')}")
         coords = geocoder(mag.get("adresse", ""))
         if not coords:
             raise RuntimeError("Impossible de géocoder l'adresse du magasin.")
         lat, lon = coords
         mag["latitude"], mag["longitude"] = lat, lon
     if verbose:
-        print(f"[magasin] {mag.get('nom')} @ ({lat:.4f}, {lon:.4f}) rayon={rayon}km dep={deps}")
+        _log(f"[magasin] {mag.get('nom')} @ ({lat:.4f}, {lon:.4f}) rayon={rayon}km dep={deps}")
 
     # 2. Catégories actives et codes NAF
     categories_actives = [c for c, on in config.get("categories", {}).items() if on]
@@ -306,7 +314,7 @@ def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
             codes_naf.append(code)
             code_to_cat[code] = cat
     if verbose:
-        print(f"[naf] {len(codes_naf)} codes NAF interrogés, {len(categories_actives)} catégories")
+        _log(f"[naf] {len(codes_naf)} codes NAF interrogés, {len(categories_actives)} catégories")
 
     # 3. Source SIRENE
     producteurs = []
@@ -318,15 +326,15 @@ def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
         cached = cache_util.load(cache_dir, cache_key, ttl)
         if cached is not None:
             results = cached
-            if verbose: print(f"[sirene] cache hit ({len(results)} brut)")
+            _log(f"[sirene] cache hit ({len(results)} brut)")
         else:
-            if verbose: print(f"[sirene] interrogation API ({len(codes_naf)} codes × {len(deps)} dpts, 4 workers parallèles)...")
+            _log(f"[sirene] interrogation API ({len(codes_naf)} codes × {len(deps)} dpts, 4 workers parallèles)...")
             def _cb(i, total, code, n):
                 if verbose:
                     print(f"  [{i}/{total}] {code} -> +{n} nouveaux", flush=True)
             results = sirene.chercher_multi(codes_naf, deps, progress_cb=_cb)
             cache_util.save(cache_dir, cache_key, results)
-            if verbose: print(f"[sirene] {len(results)} résultats bruts")
+            _log(f"[sirene] {len(results)} résultats bruts")
 
         for r in results:
             p = sirene.extraire_normalise(r)
@@ -350,8 +358,8 @@ def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
             producteurs.append(p)
 
     if verbose:
-        print(f"[sirene] {len(producteurs)} producteurs gardés après filtres + rayon")
-        print(f"[exclus] {exclus}")
+        _log(f"[sirene] {len(producteurs)} producteurs gardés après filtres + rayon")
+        _log(f"[exclus] {exclus}")
 
     # 4. Sources labels
     # Source nationale : Agence Bio
@@ -361,18 +369,18 @@ def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
             matcher_label_sur_producteurs(producteurs, items, "label_agence_bio")
             n = ajouter_producteurs_label_orphelins(producteurs, items, "label_agence_bio",
                                                     lat, lon, rayon)
-            if verbose: print(f"[agence_bio] {len(items)} items, {n} orphelins ajoutés")
+            _log(f"[agence_bio] {len(items)} items, {n} orphelins ajoutés")
         except Exception as e:
-            if verbose: print(f"[agence_bio] erreur: {e}")
+            _log(f"[agence_bio] erreur: {e}")
 
     # Source nationale : INAO AOP/IGP
     if sources_actives.get("inao", True):
         try:
             items = labels.inao(cache_dir, ttl)
             matcher_label_sur_producteurs(producteurs, items, "label_inao")
-            if verbose: print(f"[inao] {len(items)} items matchés")
+            _log(f"[inao] {len(items)} items matchés")
         except Exception as e:
-            if verbose: print(f"[inao] erreur: {e}")
+            _log(f"[inao] erreur: {e}")
 
     # Sources régionales (déclaratives YAML)
     if sources_actives.get("regionales", True):
@@ -381,9 +389,9 @@ def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
             for nom_source, items in par_source.items():
                 cle_label = f"label_{nom_source}"
                 matcher_label_sur_producteurs(producteurs, items, cle_label)
-                if verbose: print(f"[{nom_source}] {len(items)} items, matchés sur SIRENE")
+                _log(f"[{nom_source}] {len(items)} items, matchés sur SIRENE")
         except Exception as e:
-            if verbose: print(f"[regions] erreur: {e}")
+            _log(f"[regions] erreur: {e}")
 
     # 5. Score
     for p in producteurs:
@@ -396,7 +404,7 @@ def run(config: dict, naf_map: dict, verbose: bool = True) -> pd.DataFrame:
         avant = len(producteurs)
         producteurs = [p for p in producteurs if p.get("score_pertinence", 0) >= seuil]
         if verbose:
-            print(f"[mode={mode}] {len(producteurs)}/{avant} producteurs gardés (score >= {seuil})")
+            _log(f"[mode={mode}] {len(producteurs)}/{avant} producteurs gardés (score >= {seuil})")
 
     # 7. DataFrame trié — score décroissant puis distance croissante (les meilleurs en haut)
     df = pd.DataFrame(producteurs)
@@ -419,12 +427,10 @@ def export_excel(df: pd.DataFrame, path: str) -> None:
         return
     colonnes = [
         "categorie", "nom_complet", "distance_km", "commune", "code_postal", "adresse",
+        "site_web", "telephone", "email", "fiche_annuaire",
         "code_naf", "libelle_naf", "categorie_entreprise", "tranche_effectif",
         "est_bio", "est_patrimoine_vivant", "est_entrepreneur_individuel",
-        "label_agence_bio", "label_bienvenue_ferme", "label_cducentre",
-        "label_marque_parc_brenne", "label_inao",
         "score_pertinence", "dirigeant_principal", "siren", "siret",
-        "tel_google", "site_google", "note_google", "nb_avis_google",
         "source_label_seul", "a_contacter",
     ]
     presentes = [c for c in colonnes if c in df.columns]
@@ -490,10 +496,24 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
         if r.get("label_agence_bio"): flags.append("Agence Bio")
         if r.get("est_patrimoine_vivant"): flags.append("EPV")
         flags_str = " · ".join(flags) if flags else "-"
+        site = r.get("site_web", "")
+        tel = r.get("telephone", "")
+        annuaire = r.get("fiche_annuaire", "")
+        lignes_contact = []
+        if site:
+            url_site = site if site.startswith("http") else "https://" + site
+            lignes_contact.append(f"🌐 <a href='{url_site}' target='_blank'>{site}</a>")
+        if tel:
+            lignes_contact.append(f"☎ {tel}")
+        if annuaire:
+            lignes_contact.append(f"<a href='{annuaire}' target='_blank'>Fiche annuaire-entreprises</a>")
+        contact_str = "<br>".join(lignes_contact) if lignes_contact else ""
+
         popup = (f"<b>{r.get('nom_complet','')}</b><br>"
                  f"<i>{cat}</i> — {r.get('distance_km','?')} km<br>"
                  f"{r.get('adresse','')}, {r.get('code_postal','')} {r.get('commune','')}<br>"
-                 f"NAF : {r.get('code_naf','')} {r.get('libelle_naf','')}<br>"
+                 + (f"{contact_str}<br>" if contact_str else "")
+                 + f"NAF : {r.get('code_naf','')} {r.get('libelle_naf','')}<br>"
                  f"Labels : {flags_str}<br>"
                  f"Dirigeant : {r.get('dirigeant_principal','')}<br>"
                  f"Score : {r.get('score_pertinence',0)}")

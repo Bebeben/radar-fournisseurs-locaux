@@ -113,6 +113,27 @@ def extraire_normalise(r: dict) -> dict:
         dirigeant_principal = f"{prenom} {nom}".strip()
         if not dirigeant_principal:
             dirigeant_principal = d.get("denomination") or ""
+    # Site web et téléphone : on cherche dans plusieurs champs possibles
+    site_web = (
+        r.get("site_internet")
+        or complements.get("site_internet")
+        or complements.get("site_web")
+        or ""
+    )
+    telephone = (
+        r.get("telephone")
+        or complements.get("telephone")
+        or ""
+    )
+    email = (
+        r.get("email")
+        or complements.get("email")
+        or ""
+    )
+
+    # Lien direct vers la fiche annuaire-entreprises (toujours dispo via SIREN)
+    fiche_annuaire = f"https://annuaire-entreprises.data.gouv.fr/entreprise/{r.get('siren', '')}" if r.get("siren") else ""
+
     return {
         "siren": r.get("siren"),
         "siret": siege.get("siret"),
@@ -133,4 +154,8 @@ def extraire_normalise(r: dict) -> dict:
         "est_ess": bool(complements.get("est_ess")),
         "est_entrepreneur_individuel": bool(complements.get("est_entrepreneur_individuel")),
         "dirigeant_principal": dirigeant_principal,
+        "site_web": site_web,
+        "telephone": telephone,
+        "email": email,
+        "fiche_annuaire": fiche_annuaire,
     }
