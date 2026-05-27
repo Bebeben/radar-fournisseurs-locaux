@@ -130,31 +130,14 @@ st.set_page_config(
 # Rouge U : #E2001A — appliqué aux titres, boutons, accents
 st.markdown("""
 <style>
-    /* Logo U + bannière en haut */
+    /* Bannière en haut (sans logo) */
     .u-header {
         background: #E2001A;
         color: white;
-        padding: 18px 24px;
+        padding: 20px 28px;
         border-radius: 6px;
         margin-bottom: 24px;
-        display: flex;
-        align-items: center;
-        gap: 20px;
         box-shadow: 0 2px 8px rgba(226, 0, 26, 0.15);
-    }
-    .u-logo {
-        background: white;
-        color: #E2001A;
-        font-weight: 900;
-        font-size: 42px;
-        line-height: 1;
-        padding: 8px 18px;
-        border-radius: 8px;
-        font-family: Arial, sans-serif;
-        letter-spacing: -2px;
-    }
-    .u-title-block {
-        flex: 1;
     }
     .u-title {
         font-size: 26px;
@@ -163,25 +146,21 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
     .u-baseline {
-        font-size: 14px;
+        font-size: 13px;
         opacity: 0.92;
-        margin-top: 2px;
+        margin-top: 4px;
         font-style: italic;
-        letter-spacing: 1px;
+        letter-spacing: 1.2px;
         text-transform: uppercase;
     }
 
-    /* Titres et sous-titres en rouge U */
-    h1, h2, h3 {
-        color: #1A1A1A;
-    }
+    h1, h2, h3 { color: #1A1A1A; }
     h2 {
         border-bottom: 3px solid #E2001A;
         padding-bottom: 6px;
         margin-top: 28px;
     }
 
-    /* Bouton principal en rouge U */
     .stButton > button[kind="primary"] {
         background-color: #E2001A;
         border-color: #E2001A;
@@ -193,15 +172,9 @@ st.markdown("""
         border-color: #B30015;
     }
 
-    /* Liens en rouge U */
-    a {
-        color: #E2001A;
-    }
-    a:hover {
-        color: #B30015;
-    }
+    a { color: #E2001A; }
+    a:hover { color: #B30015; }
 
-    /* Footer */
     .u-footer {
         margin-top: 60px;
         padding: 20px;
@@ -214,11 +187,8 @@ st.markdown("""
 </style>
 
 <div class="u-header">
-    <div class="u-logo">U</div>
-    <div class="u-title-block">
-        <div class="u-title">Radar Fournisseurs Locaux</div>
-        <div class="u-baseline">Commerçants autrement</div>
-    </div>
+    <div class="u-title">Radar Fournisseurs Locaux</div>
+    <div class="u-baseline">Commerçants autrement</div>
 </div>
 """, unsafe_allow_html=True)
 
