@@ -496,7 +496,12 @@ def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.Da
             for nom_source, items in par_source.items():
                 cle_label = f"label_{nom_source}"
                 matcher_label_sur_producteurs(producteurs, items, cle_label)
-                _log(f"[{nom_source}] {len(items)} items, matchés sur SIRENE")
+                # Ajouter les orphelins : producteurs présents sur le site label mais
+                # qui n'ont pas matché un producteur SIRENE existant
+                n_orph = ajouter_producteurs_label_orphelins(
+                    producteurs, items, cle_label, lat, lon, rayon
+                )
+                _log(f"[{nom_source}] {len(items)} items, {n_orph} orphelins ajoutés")
         except Exception as e:
             _log(f"[regions] erreur: {e}")
 

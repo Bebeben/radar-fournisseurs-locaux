@@ -1,38 +1,8 @@
-"""Sources labels — orchestrateur."""
-
-# Helper de géocodage gratuit (api-adresse.data.gouv.fr) avec cache léger en mémoire
-_geo_cache: dict = {}
-
-
-def _geocoder_commune(commune: str, code_postal: str = "") -> tuple[float, float] | None:
-    """Géocode une commune via api-adresse (gratuit, sans clé). Renvoie (lat, lon) ou None."""
-    if not commune:
-        return None
-    cache_key = f"{commune}|{code_postal}".lower()
-    if cache_key in _geo_cache:
-        return _geo_cache[cache_key]
-    import requests as _rq
-    q = f"{commune} {code_postal}".strip()
-    try:
-        r = _rq.get("https://api-adresse.data.gouv.fr/search/",
-                    params={"q": q, "type": "municipality", "limit": 1}, timeout=5)
-        feats = (r.json() or {}).get("features") or []
-        if feats:
-            lon, lat = feats[0]["geometry"]["coordinates"]
-            _geo_cache[cache_key] = (lat, lon)
-            return (lat, lon)
-    except Exception:
-        pass
-    _geo_cache[cache_key] = None
-    return None
-
-
-"""
+"""Sources labels — orchestrateur.
 
 Sources nationales (en Python, API spécifiques) :
 - Agence Bio (annuaire opérateurs bio)
 - INAO (AOP/IGP)
-- Marchés des Producteurs de Pays (national, Chambres Agri)
 
 Sources régionales (déclaratives, fichiers sources_regions/*.yaml) :
 - © du Centre, Saveurs en'Or, Produit en Bretagne, Sud de France, etc.
@@ -47,6 +17,32 @@ import requests
 from . import cache_util
 from . import scraper_generique
 from . import regions_loader
+
+
+# Helper de géocodage gratuit (api-adresse.data.gouv.fr) avec cache mémoire
+_geo_cache: dict = {}
+
+
+def _geocoder_commune(commune: str, code_postal: str = "") -> tuple[float, float] | None:
+    """Géocode une commune via api-adresse (gratuit, sans clé). Renvoie (lat, lon) ou None."""
+    if not commune:
+        return None
+    cache_key = f"{commune}|{code_postal}".lower()
+    if cache_key in _geo_cache:
+        return _geo_cache[cache_key]
+    q = f"{commune} {code_postal}".strip()
+    try:
+        r = requests.get("https://api-adresse.data.gouv.fr/search/",
+                         params={"q": q, "type": "municipality", "limit": 1}, timeout=5)
+        feats = (r.json() or {}).get("features") or []
+        if feats:
+            lon, lat = feats[0]["geometry"]["coordinates"]
+            _geo_cache[cache_key] = (lat, lon)
+            return (lat, lon)
+    except Exception:
+        pass
+    _geo_cache[cache_key] = None
+    return None
 
 UA = {"User-Agent": "RadarFournisseursLocaux/1.0 (associé Super U)"}
 
