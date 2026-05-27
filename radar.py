@@ -192,7 +192,7 @@ def calculer_score(p: dict) -> int:
 # ====================================================================
 
 def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dict], cle_label: str) -> None:
-    """Modifie producteurs en place : ajoute un drapeau `cle_label` quand match."""
+    """Modifie producteurs en place : ajoute un drapeau `cle_label` + l'URL de fiche label."""
     for item in items_label:
         nom_l = (item.get("nom") or "").lower()
         commune_l = (item.get("commune") or "").lower()
@@ -201,20 +201,22 @@ def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dic
             continue
         best_idx, best_score = -1, 0
         for i, p in enumerate(producteurs):
-            # match SIRET d'abord
             if siret_l and p.get("siret") == siret_l:
                 best_idx, best_score = i, 100
                 break
             nom_p = (p.get("nom_complet") or "").lower()
             commune_p = (p.get("commune") or "").lower()
             score = fuzz.token_set_ratio(nom_l, nom_p)
-            # bonus si même commune
             if commune_l and commune_p and commune_l == commune_p:
                 score = min(100, score + 10)
             if score > best_score:
                 best_idx, best_score = i, score
         if best_idx >= 0 and best_score >= 85:
             producteurs[best_idx][cle_label] = True
+            # Stocke aussi l'URL de la fiche label si dispo (pour cliquer dans le rapport)
+            url_fiche = item.get("url_fiche")
+            if url_fiche:
+                producteurs[best_idx][f"url_{cle_label}"] = url_fiche
 
 
 def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: list[dict],
@@ -241,7 +243,8 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
         else:
             # pas de coords : on ne peut pas trancher, on garde mais on flague
             pass
-        producteurs.append({
+        url_fiche = item.get("url_fiche", "")
+        nouveau = {
             "siren": "",
             "siret": item.get("siret", ""),
             "nom_complet": nom,
@@ -261,11 +264,17 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
             "est_ess": False,
             "est_entrepreneur_individuel": False,
             "dirigeant_principal": "",
+            "site_web": "",
+            "telephone": "",
+            "email": "",
+            "fiche_annuaire": "",
             "categorie": categorie,
             "distance_km": dist,
             "source_label_seul": True,
             cle_label: True,
-        })
+            f"url_{cle_label}": url_fiche,
+        }
+        producteurs.append(nouveau)
         n_ajoutes += 1
     return n_ajoutes
 
@@ -425,7 +434,7 @@ def export_excel(df: pd.DataFrame, path: str) -> None:
     if df.empty:
         df.to_excel(path, index=False)
         return
-    colonnes = [
+    colonnes_principales = [
         "categorie", "nom_complet", "distance_km", "commune", "code_postal", "adresse",
         "site_web", "telephone", "email", "fiche_annuaire",
         "code_naf", "libelle_naf", "categorie_entreprise", "tranche_effectif",
@@ -433,8 +442,15 @@ def export_excel(df: pd.DataFrame, path: str) -> None:
         "score_pertinence", "dirigeant_principal", "siren", "siret",
         "source_label_seul", "a_contacter",
     ]
-    presentes = [c for c in colonnes if c in df.columns]
-    df_out = df[presentes + [c for c in df.columns if c not in presentes]]
+    # Colonnes labels (booléens) — toujours présentes même vides
+    colonnes_labels = sorted([c for c in df.columns if c.startswith("label_")])
+    # Colonnes URL fiches label
+    colonnes_urls = sorted([c for c in df.columns if c.startswith("url_label_")])
+
+    presentes = [c for c in colonnes_principales if c in df.columns]
+    autres = [c for c in df.columns
+              if c not in presentes and c not in colonnes_labels and c not in colonnes_urls]
+    df_out = df[presentes + colonnes_labels + colonnes_urls + autres]
     with pd.ExcelWriter(path, engine="openpyxl") as w:
         df_out.to_excel(w, index=False, sheet_name="Producteurs")
         ws = w.sheets["Producteurs"]
@@ -488,14 +504,29 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
             continue
         cat = r.get("categorie") or "inconnu"
         couleur = CATEGORIES_COULEURS.get(cat, "gray")
-        flags = []
-        if r.get("est_bio"): flags.append("Bio")
-        if r.get("label_cducentre"): flags.append("© du Centre")
-        if r.get("label_marque_parc_brenne"): flags.append("Marque Parc Brenne")
-        if r.get("label_bienvenue_ferme"): flags.append("Bienvenue à la Ferme")
-        if r.get("label_agence_bio"): flags.append("Agence Bio")
-        if r.get("est_patrimoine_vivant"): flags.append("EPV")
-        flags_str = " · ".join(flags) if flags else "-"
+        # Labels avec lien vers la fiche détaillée quand dispo
+        labels_html = []
+        def _fmt_label(libelle: str, cle_label: str):
+            url = r.get(f"url_{cle_label}", "")
+            if isinstance(url, str) and url:
+                return f"<a href='{url}' target='_blank'>{libelle}</a>"
+            return libelle
+        if r.get("est_bio"): labels_html.append("Bio (SIRENE)")
+        if r.get("label_agence_bio"): labels_html.append(_fmt_label("Agence Bio", "label_agence_bio"))
+        if r.get("label_cducentre"): labels_html.append(_fmt_label("© du Centre", "label_cducentre"))
+        if r.get("label_marque_parc_brenne"): labels_html.append(_fmt_label("Marque Parc Brenne", "label_marque_parc_brenne"))
+        # Labels régionaux génériques (les autres labels régionaux scrapés)
+        for col in r.index if hasattr(r, "index") else r.keys():
+            if isinstance(col, str) and col.startswith("label_") and r.get(col) and col not in {
+                "label_agence_bio", "label_cducentre", "label_marque_parc_brenne",
+                "label_bienvenue_ferme", "label_inao",
+            }:
+                # Extraire le nom lisible
+                nom_label = col.replace("label_", "").replace("_", " ").title()
+                labels_html.append(_fmt_label(nom_label, col))
+        if r.get("label_inao"): labels_html.append(_fmt_label("AOP/IGP (INAO)", "label_inao"))
+        if r.get("est_patrimoine_vivant"): labels_html.append("EPV")
+        flags_str = " · ".join(labels_html) if labels_html else "-"
         site = r.get("site_web", "")
         tel = r.get("telephone", "")
         annuaire = r.get("fiche_annuaire", "")

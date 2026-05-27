@@ -45,7 +45,25 @@ def fetch_html(url: str, timeout: int = 10) -> str | None:
     return None
 
 
-def scrape_avec_config(html: str, config: dict, label_nom: str) -> list[dict]:
+def _resolve_url(href: str, base_url: str) -> str:
+    """Résout une URL relative en absolue par rapport à base_url."""
+    if not href:
+        return ""
+    if href.startswith("http://") or href.startswith("https://"):
+        return href
+    if href.startswith("//"):
+        return "https:" + href
+    # URL relative : extraire le scheme + host de base_url
+    if base_url and "://" in base_url:
+        scheme_host = base_url.split("/", 3)
+        base = "/".join(scheme_host[:3])
+        if href.startswith("/"):
+            return base + href
+        return base + "/" + href
+    return href
+
+
+def scrape_avec_config(html: str, config: dict, label_nom: str, base_url: str = "") -> list[dict]:
     """Scrape selon une config explicite. config attendu :
         {
           "selecteur_lien": "a.producteur-card",
@@ -53,6 +71,7 @@ def scrape_avec_config(html: str, config: dict, label_nom: str) -> list[dict]:
           "selecteur_commune": ".ville", # optionnel
           "regex_commune": true,         # extraire commune/CP du texte via regex (défaut true)
         }
+    base_url sert à résoudre les liens relatifs en absolus.
     """
     soup = BeautifulSoup(html, "lxml")
     out = []
@@ -62,6 +81,14 @@ def scrape_avec_config(html: str, config: dict, label_nom: str) -> list[dict]:
     utiliser_regex = config.get("regex_commune", True)
 
     for el in soup.select(sel_lien):
+        # URL de la fiche détaillée (très précieux pour Benjamin pour cliquer)
+        url_fiche = ""
+        if el.name == "a" and el.get("href"):
+            url_fiche = _resolve_url(el.get("href"), base_url)
+        else:
+            link_inside = el.select_one("a[href]")
+            if link_inside:
+                url_fiche = _resolve_url(link_inside.get("href", ""), base_url)
         txt_complet = el.get_text(" ", strip=True)
         # Nom
         if sel_nom:
@@ -95,11 +122,12 @@ def scrape_avec_config(html: str, config: dict, label_nom: str) -> list[dict]:
                 "latitude": None,
                 "longitude": None,
                 "label": label_nom,
+                "url_fiche": url_fiche,
             })
     return out
 
 
-def scrape_auto(html: str, label_nom: str) -> list[dict]:
+def scrape_auto(html: str, label_nom: str, base_url: str = "") -> list[dict]:
     """Heuristiques automatiques quand on n'a pas de config."""
     soup = BeautifulSoup(html, "lxml")
     out = []
@@ -124,6 +152,14 @@ def scrape_auto(html: str, label_nom: str) -> list[dict]:
         txt = el.get_text(" ", strip=True)
         commune, cp = extraire_commune_cp(txt)
         nom = re.sub(r"\s+", " ", nom)[:120].strip()
+        # URL de la fiche
+        url_fiche = ""
+        if el.name == "a" and el.get("href"):
+            url_fiche = _resolve_url(el.get("href"), base_url)
+        else:
+            link = el.select_one("a[href]")
+            if link:
+                url_fiche = _resolve_url(link.get("href", ""), base_url)
         out.append({
             "nom": nom,
             "commune": commune,
@@ -131,6 +167,7 @@ def scrape_auto(html: str, label_nom: str) -> list[dict]:
             "latitude": None,
             "longitude": None,
             "label": label_nom,
+            "url_fiche": url_fiche,
         })
 
     # Déduplication par (nom, commune)
@@ -163,8 +200,8 @@ def scrape_source(source_def: dict) -> list[dict]:
         return []
     config = source_def.get("config") or {}
     if config:
-        results = scrape_avec_config(html, config, nom)
+        results = scrape_avec_config(html, config, nom, base_url=url)
         if results:
             return results
         # Fallback auto si la config n'a rien donné
-    return scrape_auto(html, nom)
+    return scrape_auto(html, nom, base_url=url)
