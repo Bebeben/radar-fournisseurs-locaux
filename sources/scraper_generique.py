@@ -213,25 +213,50 @@ def scrape_auto(html: str, label_nom: str, base_url: str = "") -> list[dict]:
 
 def scrape_source(source_def: dict) -> list[dict]:
     """Point d'entrée : reçoit une définition de source et renvoie les producteurs.
-
-    source_def attendu :
-        {
-          "nom": "saveurs_en_or",
-          "url": "https://...",
-          "config": {...}   # optionnel — si absent, scrape_auto
-        }
+    Gère automatiquement la pagination si l'URL contient ?listpage=, ?page= ou ?p=.
     """
     nom = source_def.get("nom", "inconnu")
     url = source_def.get("url")
     if not url:
         return []
-    html = fetch_html(url)
-    if not html:
-        return []
     config = source_def.get("config") or {}
-    if config:
-        results = scrape_avec_config(html, config, nom, base_url=url)
-        if results:
-            return results
-        # Fallback auto si la config n'a rien donné
-    return scrape_auto(html, nom, base_url=url)
+
+    def _scrape_une_page(u: str) -> list[dict]:
+        html = fetch_html(u)
+        if not html:
+            return []
+        if config:
+            r = scrape_avec_config(html, config, nom, base_url=u)
+            if r:
+                return r
+        return scrape_auto(html, nom, base_url=u)
+
+    # Détection pagination
+    pagination_param = None
+    for p in ("listpage", "page", "p"):
+        if f"{p}=" in url:
+            pagination_param = p
+            break
+
+    if not pagination_param:
+        return _scrape_une_page(url)
+
+    # Pagination : itère jusqu'à ne plus avoir de nouveaux items (max 20 pages de sécurité)
+    all_results = []
+    vus_noms = set()
+    for page_num in range(1, 21):
+        page_url = re.sub(rf"({pagination_param}=)\d+", rf"\g<1>{page_num}", url)
+        items = _scrape_une_page(page_url)
+        if not items:
+            break
+        nouveaux = 0
+        for it in items:
+            key = (it.get("nom", "").lower(), it.get("commune", "").lower())
+            if key not in vus_noms:
+                vus_noms.add(key)
+                all_results.append(it)
+                nouveaux += 1
+        if nouveaux == 0:
+            break  # plus de nouveaux items = fin pagination
+        time.sleep(0.5)  # politesse
+    return all_results

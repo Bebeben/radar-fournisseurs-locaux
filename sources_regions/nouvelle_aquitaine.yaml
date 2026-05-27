@@ -12,3 +12,10 @@ sources:
     description: "IDOKI — charte fermière Pays Basque (64), 93 producteurs agréés sur 300 adhérents APFPB"
     url: "https://www.producteurs-fermiers-pays-basque.fr/"
     departements_specifiques: ["64"]
+  - nom: "visit_limousin_87"
+    description: "Visit Limousin — annuaire producteurs Haute-Vienne (OT Limousin). NOTE: paginé, on ne capture que la page 1 (~12 producteurs)."
+    url: "https://www.visitlimousin.com/sejourner/faire-son-marche/producteurs-locaux-en-haute-vienne/?listpage=1"
+    config:
+      selecteur_lien: "article.item_sheet"
+      regex_commune: true
+    departements_specifiques: ["87"]
