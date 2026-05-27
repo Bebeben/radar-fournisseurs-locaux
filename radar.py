@@ -201,38 +201,66 @@ def calculer_score(p: dict) -> int:
 
 import re as _re_match
 
+# Préfixes juridiques / civilités à virer pour la comparaison
+_PREFIXES_BRUIT = _re_match.compile(
+    r"\b(gaec|earl|scea|sarl|sas|sasu|sci|sa|eurl|sce|ei|"
+    r"mr|mme|monsieur|madame|"
+    r"ferme(?:\s+de(?:s)?|\s+du|\s+la|\s+le|\s+les)?|"
+    r"domaine(?:\s+de(?:s)?|\s+du|\s+la|\s+le|\s+les)?)\b",
+    _re_match.IGNORECASE,
+)
+
+
+def _normaliser_nom(nom: str) -> str:
+    """Normalisation pour le matching : minuscules, sans préfixes juridiques/civilités, sans ponctuation."""
+    if not nom:
+        return ""
+    n = nom.lower()
+    n = _PREFIXES_BRUIT.sub(" ", n)
+    n = _re_match.sub(r"[^\w\s\-]", " ", n)
+    n = _re_match.sub(r"\s+", " ", n).strip()
+    return n
+
 
 def _noms_alternatifs(nom: str) -> list[str]:
     """Renvoie les variantes utiles d'un nom pour le matching :
-    - le nom complet
-    - le contenu de chaque parenthèse (nom commercial dans SIRENE : "DUPONT (LA BRASSERIE VERTE)")
-    - le préfixe avant la première parenthèse (raison sociale brute)
+    - le nom complet normalisé
+    - le contenu de chaque parenthèse normalisé (nom commercial)
+    - le préfixe avant la première parenthèse normalisé
     """
     if not nom:
         return []
-    nom = nom.lower()
-    variantes = {nom}
-    # Contenu des parenthèses
-    for m in _re_match.findall(r"\(([^)]+)\)", nom):
+    nom_lower = nom.lower()
+    variantes = {nom_lower, _normaliser_nom(nom)}
+    for m in _re_match.findall(r"\(([^)]+)\)", nom_lower):
         variantes.add(m.strip())
-    # Préfixe avant la première parenthèse
-    if "(" in nom:
-        variantes.add(nom.split("(")[0].strip())
-    return [v for v in variantes if v]
+        variantes.add(_normaliser_nom(m))
+    if "(" in nom_lower:
+        avant = nom_lower.split("(")[0].strip()
+        variantes.add(avant)
+        variantes.add(_normaliser_nom(avant))
+    # Filtre : on garde uniquement les variantes d'au moins 4 caractères (sinon faux positifs)
+    return [v for v in variantes if v and len(v) >= 4]
 
 
 def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dict], cle_label: str) -> None:
-    """Modifie producteurs en place : ajoute un drapeau `cle_label` + l'URL de fiche label.
+    """Tag les producteurs SIRENE qui correspondent à un item label.
 
-    Matching robuste : on essaie toutes les variantes du nom SIRENE (raison sociale brute,
-    nom commercial entre parenthèses, nom complet) contre le nom du label.
-    Bonus si même commune.
+    Matching strict pour éviter les faux positifs :
+    - Seuil de base 90 (au lieu de 85)
+    - Bonus commune +5 seulement (au lieu de +10)
+    - Variantes du nom SIRENE testées (raison sociale + nom commercial entre parenthèses)
+    - Normalisation : suppression des préfixes juridiques (GAEC, EARL, SARL...) et civilités
+    - Filtrage des noms trop courts (< 4 caractères) qui matchent par hasard
     """
+    SEUIL_MATCH = 90
+    BONUS_COMMUNE = 5
     for item in items_label:
-        nom_l = (item.get("nom") or "").lower()
+        nom_l_raw = (item.get("nom") or "").lower()
+        nom_l = _normaliser_nom(item.get("nom") or "")
         commune_l = (item.get("commune") or "").lower()
         siret_l = (item.get("siret") or "")
-        if not nom_l:
+        if not nom_l or len(nom_l) < 4:
             continue
         best_idx, best_score = -1, 0
         for i, p in enumerate(producteurs):
@@ -240,15 +268,14 @@ def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dic
                 best_idx, best_score = i, 100
                 break
             commune_p = (p.get("commune") or "").lower()
-            # On teste TOUTES les variantes du nom SIRENE
             variantes = _noms_alternatifs(p.get("nom_complet") or "")
             for variante in variantes:
                 score = fuzz.token_set_ratio(nom_l, variante)
                 if commune_l and commune_p and commune_l == commune_p:
-                    score = min(100, score + 10)
+                    score = min(100, score + BONUS_COMMUNE)
                 if score > best_score:
                     best_idx, best_score = i, score
-        if best_idx >= 0 and best_score >= 85:
+        if best_idx >= 0 and best_score >= SEUIL_MATCH:
             producteurs[best_idx][cle_label] = True
             url_fiche = item.get("url_fiche")
             if url_fiche:

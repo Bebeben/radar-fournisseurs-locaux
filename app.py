@@ -214,7 +214,7 @@ with st.sidebar:
     )
     # Rayon : récupère valeur preset si on vient de charger un preset
     rayon_default = st.session_state.pop("_preset_rayon", 30) if "_preset_rayon" in st.session_state else 30
-    rayon = st.slider("Rayon (km)", 5, 100, int(rayon_default))
+    rayon = st.slider("Rayon (km)", 5, 200, int(rayon_default))
 
     suggestions = chercher_communes(query)
     ville_choisie = None
