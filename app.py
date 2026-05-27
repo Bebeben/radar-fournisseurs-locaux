@@ -126,41 +126,15 @@ st.set_page_config(
     page_icon="🛒",
 )
 
-# ============= CHARTE GRAPHIQUE SUPER U =============
-# Rouge U : #E2001A — appliqué aux titres, boutons, accents
+# Charte couleur (rouge primaire en CSS pour boutons/liens, sans bandeau ni texte)
 st.markdown("""
 <style>
-    /* Bannière en haut (sans logo) */
-    .u-header {
-        background: #E2001A;
-        color: white;
-        padding: 20px 28px;
-        border-radius: 6px;
-        margin-bottom: 24px;
-        box-shadow: 0 2px 8px rgba(226, 0, 26, 0.15);
-    }
-    .u-title {
-        font-size: 26px;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: 0.3px;
-    }
-    .u-baseline {
-        font-size: 13px;
-        opacity: 0.92;
-        margin-top: 4px;
-        font-style: italic;
-        letter-spacing: 1.2px;
-        text-transform: uppercase;
-    }
-
     h1, h2, h3 { color: #1A1A1A; }
     h2 {
         border-bottom: 3px solid #E2001A;
         padding-bottom: 6px;
         margin-top: 28px;
     }
-
     .stButton > button[kind="primary"] {
         background-color: #E2001A;
         border-color: #E2001A;
@@ -171,26 +145,12 @@ st.markdown("""
         background-color: #B30015;
         border-color: #B30015;
     }
-
     a { color: #E2001A; }
     a:hover { color: #B30015; }
-
-    .u-footer {
-        margin-top: 60px;
-        padding: 20px;
-        border-top: 1px solid #E2001A;
-        text-align: center;
-        color: #666;
-        font-size: 12px;
-    }
-    .u-footer strong { color: #E2001A; }
 </style>
-
-<div class="u-header">
-    <div class="u-title">Radar Fournisseurs Locaux</div>
-    <div class="u-baseline">Commerçants autrement</div>
-</div>
 """, unsafe_allow_html=True)
+
+st.title("Radar Fournisseurs Locaux")
 
 st.caption("Cartographie les producteurs alimentaires autour d'un magasin U. "
            "SIRENE + Agence Bio + labels régionaux — outil interne pour l'identification de fournisseurs en vente directe.")
@@ -451,12 +411,3 @@ if run_clicked:
                                file_name=f"{base}_carte.html", mime="text/html")
 else:
     st.info("Configure le magasin et les sources dans le panneau de gauche, puis clique sur **Lancer le radar**.")
-
-# Footer Charte U
-st.markdown("""
-<div class="u-footer">
-    <strong>U Commerçants autrement</strong> &nbsp;·&nbsp;
-    Radar Fournisseurs Locaux — outil interne d'identification de fournisseurs en vente directe<br>
-    Données : SIRENE (recherche-entreprises.api.gouv.fr) · Agence Bio · INAO · Labels régionaux scrapés
-</div>
-""", unsafe_allow_html=True)
