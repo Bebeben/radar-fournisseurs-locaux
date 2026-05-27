@@ -37,14 +37,17 @@ fruits_legumes_jus:
   - "10.39A"   # autres transformations conserves légumes
   - "10.39B"   # autres transformations conserves fruits
 
-boissons_biere_cidre_vin:
+boissons_biere_cidre:
   - "11.01Z"   # distillation, rectification spiritueux
-  - "11.02A"   # fabrication vins effervescents
-  - "11.02B"   # vinification
   - "11.03Z"   # fabrication cidre et autres vins de fruits
   - "11.05Z"   # fabrication bière
   - "11.07A"   # industrie eaux de table
   - "11.07B"   # boissons rafraîchissantes
+
+vin_viticulture:
+  - "01.21Z"   # viticulture (vigneron-récoltant)
+  - "11.02A"   # fabrication vins effervescents (Champagne, crémants)
+  - "11.02B"   # vinification (vins tranquilles)
 
 epicerie_huile_sucre:
   - "10.41A"   # huiles et graisses végétales brutes
@@ -62,7 +65,7 @@ epicerie_huile_sucre:
 agriculture_ferme:
   - "01.11Z"   # céréales (sauf riz), légumineuses, oléagineux
   - "01.13Z"   # culture légumes, melons, racines, tubercules
-  - "01.21Z"   # viticulture
+  # 01.21Z viticulture est désormais dans sa propre catégorie 'vin_viticulture'
   - "01.24Z"   # fruits à pépins et à noyau
   - "01.25Z"   # autres fruits d'arbres et arbustes (incl. baies)
   - "01.28Z"   # plantes à parfum, aromatiques, médicinales et pharmaceutiques (SAFRAN, plantes médicinales, tisanes)

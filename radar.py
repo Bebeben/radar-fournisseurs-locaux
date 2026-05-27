@@ -39,11 +39,14 @@ from sources import sirene, labels, cache_util
 CATEGORIES_COULEURS = {
     "fromage_laitier": "blue",
     "viande_charcuterie": "red",
-    "boulangerie_patisserie": "orange",
+    "biscuiterie_chocolat_pates": "orange",
     "fruits_legumes_jus": "green",
-    "boissons_biere_cidre_vin": "purple",
+    "boissons_biere_cidre": "lightred",
+    "vin_viticulture": "darkpurple",
     "epicerie_huile_sucre": "darkgreen",
     "agriculture_ferme": "cadetblue",
+    "aquaculture_poisson": "lightblue",
+    "champignons_forestier": "beige",
     "inconnu": "gray",
 }
 

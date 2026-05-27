@@ -17,7 +17,8 @@ categories:
   viande_charcuterie: true
   biscuiterie_chocolat_pates: true
   fruits_legumes_jus: true
-  boissons_biere_cidre_vin: true
+  boissons_biere_cidre: true
+  vin_viticulture: true
   epicerie_huile_sucre: true
   agriculture_ferme: true
   aquaculture_poisson: true
