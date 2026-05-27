@@ -166,6 +166,11 @@ st.markdown("""
 
 st.title("Radar Fournisseurs Locaux")
 
+# Lien visible en haut de page vers la page d'ajout de source (multipage Streamlit)
+nav_col1, nav_col2 = st.columns([5, 2])
+with nav_col2:
+    st.page_link("pages/1_Ajouter_une_source.py", label="➕ Ajouter une source", icon="🔗")
+
 st.caption("Cartographie les producteurs alimentaires autour d'un magasin U. "
            "SIRENE + Agence Bio + labels régionaux — outil interne pour l'identification de fournisseurs en vente directe.")
 
@@ -199,9 +204,14 @@ with st.sidebar:
                     st.session_state["_preset_nom"] = v.get("nom", "")
                     st.rerun()
 
-    query = st.text_input("Commune", "Saint-Benoît-du-Sault", key="ville_search",
-                           help="Tape le nom de la commune (≥ 2 lettres). "
-                                "L'app suggère les correspondances officielles.")
+    query = st.text_input(
+        "Commune (appuie sur Entrée après avoir tapé)",
+        "Saint-Benoît-du-Sault",
+        key="ville_search",
+        help="Tape le nom de la commune puis appuie sur Entrée. "
+             "Si une seule commune correspond, elle est sélectionnée d'office. "
+             "S'il y a ambiguïté, un menu déroulant apparaît pour choisir.",
+    )
     # Rayon : récupère valeur preset si on vient de charger un preset
     rayon_default = st.session_state.pop("_preset_rayon", 30) if "_preset_rayon" in st.session_state else 30
     rayon = st.slider("Rayon (km)", 5, 100, int(rayon_default))
@@ -373,6 +383,11 @@ with st.sidebar:
                                   value=True,
                                   help="Chargés automatiquement selon les départements demandés "
                                        "depuis les fichiers sources_regions/*.yaml")
+
+    # Lien rapide vers la page d'ajout de source
+    st.page_link("pages/1_Ajouter_une_source.py",
+                  label="➕ Ajouter / tester une nouvelle source",
+                  icon="🔗")
 
     # Google Maps a été retiré pour rester full gratuit. Enrichissement via Nominatim OSM à venir.
 

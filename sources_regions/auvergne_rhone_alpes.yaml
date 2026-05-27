@@ -3,7 +3,7 @@ departements: ["01", "03", "07", "15", "26", "38", "42", "43", "63", "69", "73",
 sources:
   - nom: "ma_region_ses_terroirs"
     description: "Ma Région ses Terroirs — marque régionale AURA (500+ entreprises, 4500+ produits)"
-    url: "https://www.maregionsesterroirs.fr/"
+    url: "https://www.maregionsesterroirs.fr/producteur/"
   - nom: "allier_bourbonnais_produits"
     description: "Allier Bourbonnais Savoir-Faire — marque départementale (03)"
     url: "https://savoir-faire.allier-bourbonnais.fr/les-producteurs-et-artisans-alimentaires/"
@@ -23,5 +23,5 @@ sources:
     departements_specifiques: ["69"]
   - nom: "producteurs_savoie_mont_blanc"
     description: "Producteurs Savoie Mont-Blanc — marque bi-départementale (73, 74)"
-    url: "https://www.producteurs-savoie-mont-blanc.com/"
+    url: "https://www.producteurs-savoie-mont-blanc.com/producteurs/"
     departements_specifiques: ["73", "74"]

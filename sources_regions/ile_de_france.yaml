@@ -2,5 +2,5 @@ region: "Île-de-France"
 departements: ["75", "77", "78", "91", "92", "93", "94", "95"]
 sources:
   - nom: "produit_en_ile_de_france"
-    description: "Produit en Île-de-France — marque régionale (Région IdF / Terre de Saveurs)"
-    url: "https://www.produiteniledefrance.fr/"
+    description: "Produit en Île-de-France — carte interactive des producteurs"
+    url: "https://produiteniledefrance.fr/page/carte-des-producteurs"

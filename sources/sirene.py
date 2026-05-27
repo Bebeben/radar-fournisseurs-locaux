@@ -92,18 +92,22 @@ def chercher_multi(codes_naf: list[str], departements: list[str],
                    progress_cb: Callable[[int, int, str, int], None] | None = None) -> list[dict]:
     """Boucle parallèle sur plusieurs codes NAF, dédoublonne par SIREN.
 
-    progress_cb(i, total, code, n_resultats) appelé à chaque code traité.
+    progress_cb(i, total, code, n_resultats) appelé depuis le THREAD PRINCIPAL
+    (via as_completed iteration) — important pour que Streamlit mette à jour son UI.
     """
     vus = set()
     out = []
     total = len(codes_naf)
-    done = [0]
-    lock = threading.Lock()
 
-    def _job(code: str):
-        results = chercher(code, departements)
-        with lock:
-            done[0] += 1
+    with ThreadPoolExecutor(max_workers=N_WORKERS) as ex:
+        # Soumet tous les jobs, mémorise quel future correspond à quel code
+        futures = {ex.submit(chercher, code, departements): code for code in codes_naf}
+        for done_count, fut in enumerate(as_completed(futures), start=1):
+            code = futures[fut]
+            try:
+                results = fut.result()
+            except Exception:
+                results = []
             n_added = 0
             for r in results:
                 siren = r.get("siren")
@@ -111,12 +115,9 @@ def chercher_multi(codes_naf: list[str], departements: list[str],
                     vus.add(siren)
                     out.append(r)
                     n_added += 1
+            # CB depuis le thread principal — Streamlit peut rafraîchir l'UI
             if progress_cb:
-                progress_cb(done[0], total, code, n_added)
-        return n_added
-
-    with ThreadPoolExecutor(max_workers=N_WORKERS) as ex:
-        list(as_completed([ex.submit(_job, c) for c in codes_naf]))
+                progress_cb(done_count, total, code, n_added)
     return out
 
 

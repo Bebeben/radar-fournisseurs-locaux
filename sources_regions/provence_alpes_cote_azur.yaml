@@ -1,13 +1,13 @@
 region: "Provence-Alpes-Côte d'Azur"
 departements: ["04", "05", "06", "13", "83", "84"]
-# Note : pas de marque ombrelle food au niveau régional, fonctionne par marques départementales.
+# Note : PACA n'a pas de marque ombrelle food au niveau régional.
+# Les marques départementales identifiées n'ont pas toutes un annuaire scrapable.
 sources:
   - nom: "hautes_alpes_naturellement"
     description: "Hautes-Alpes Naturellement® — marque départementale (05)"
-    url: "https://www.saveurshautalpines.fr/"
+    url: "https://www.saveurshautalpines.fr/producteurs/"
     departements_specifiques: ["05"]
-  - nom: "terres_du_var"
-    description: "Terres du Var — marque départementale (83), Chambre d'agri du Var. NOTE: site uniquement en HTTP."
-    url: "http://www.terresduvar.fr/"
-    departements_specifiques: ["83"]
-  # Savourez le Vaucluse (84) : pas de site dédié (intégré au site vaucluse.fr) — à ajouter via UI si nécessaire
+  # Terres du Var (83) : site existe mais c'est juste une page de présentation,
+  # pas d'annuaire de membres scrappable. Désactivé.
+  # Savourez le Vaucluse (84) : pas de site dédié, intégré au site vaucluse.fr.
+  # Bouches-du-Rhône (13) : aucune marque ombrelle identifiée → s'appuie sur SIRENE + Agence Bio.
