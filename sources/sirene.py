@@ -121,10 +121,35 @@ def chercher_multi(codes_naf: list[str], departements: list[str],
 
 
 def extraire_normalise(r: dict) -> dict:
-    """Réduit un résultat API à un dict propre et stable pour le pipeline."""
+    """Réduit un résultat API à un dict propre et stable pour le pipeline.
+
+    IMPORTANT : si l'entreprise a `matching_etablissements`, on utilise l'établissement
+    matché (qui est dans le département cherché) plutôt que le siège global, qui peut
+    être ailleurs en France. Et on exige que cet établissement matché soit ACTIF —
+    sinon on flague `etat_etab_local = F` pour que le filtre l'exclue.
+    """
     siege = r.get("siege") or {}
     complements = r.get("complements") or {}
     dirigeants = r.get("dirigeants") or []
+
+    # Choix de l'établissement de référence (= établissement dans le dpt cherché)
+    matching = r.get("matching_etablissements") or []
+    etab_local = None
+    etab_local_etat = ""
+    if matching:
+        # Privilégier un établissement actif s'il y en a un
+        actifs = [m for m in matching if m.get("etat_administratif") == "A"]
+        if actifs:
+            etab_local = actifs[0]
+            etab_local_etat = "A"
+        else:
+            # Aucun actif : on prend le premier, on flaguera comme fermé
+            etab_local = matching[0]
+            etab_local_etat = etab_local.get("etat_administratif", "F")
+    # Si pas de matching ou siège dans le dpt cherché, on garde le siège
+    if not etab_local:
+        etab_local = siege
+        etab_local_etat = siege.get("etat_administratif", "A")
     dirigeant_principal = ""
     if dirigeants:
         d = dirigeants[0]
@@ -156,18 +181,21 @@ def extraire_normalise(r: dict) -> dict:
 
     return {
         "siren": r.get("siren"),
-        "siret": siege.get("siret"),
+        "siret": etab_local.get("siret") or siege.get("siret"),
         "nom_complet": r.get("nom_complet") or r.get("nom_raison_sociale") or "",
         "code_naf": r.get("activite_principale") or "",
         "libelle_naf": r.get("libelle_activite_principale") or "",
         "categorie_entreprise": r.get("categorie_entreprise") or "",
         "tranche_effectif": r.get("tranche_effectif_salarie") or "",
         "etat_administratif": r.get("etat_administratif") or "",
-        "adresse": siege.get("adresse") or "",
-        "commune": siege.get("libelle_commune") or "",
-        "code_postal": siege.get("code_postal") or "",
-        "latitude": siege.get("latitude"),
-        "longitude": siege.get("longitude"),
+        # IMPORTANT : on prend l'adresse/coordonnées de l'établissement LOCAL,
+        # pas du siège global. Et on flague si cet établissement local est fermé.
+        "etat_etab_local": etab_local_etat,
+        "adresse": etab_local.get("adresse") or siege.get("adresse") or "",
+        "commune": etab_local.get("libelle_commune") or siege.get("libelle_commune") or "",
+        "code_postal": etab_local.get("code_postal") or siege.get("code_postal") or "",
+        "latitude": etab_local.get("latitude") or siege.get("latitude"),
+        "longitude": etab_local.get("longitude") or siege.get("longitude"),
         "est_bio": bool(complements.get("est_bio")),
         "est_patrimoine_vivant": bool(complements.get("est_patrimoine_vivant")),
         "est_societe_mission": bool(complements.get("est_societe_mission")),

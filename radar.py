@@ -125,6 +125,11 @@ def passe_filtres(p: dict, filtres: dict) -> tuple[bool, str]:
     if filtres.get("garder_uniquement_actifs", True):
         if p.get("etat_administratif") and p["etat_administratif"] != "A":
             return False, "inactif"
+        # Filtre supplémentaire : l'établissement LOCAL (dans le dpt cherché) doit être actif aussi.
+        # Sans ça, on remontait des entreprises actives globalement mais dont l'étab local est fermé.
+        etat_local = p.get("etat_etab_local", "A")
+        if etat_local and etat_local != "A":
+            return False, "etablissement_local_ferme"
 
     naf = p.get("code_naf", "")
     if naf in CODES_NAF_EXCLUS:
@@ -191,8 +196,35 @@ def calculer_score(p: dict) -> int:
 # Fusion labels <-> SIRENE
 # ====================================================================
 
+import re as _re_match
+
+
+def _noms_alternatifs(nom: str) -> list[str]:
+    """Renvoie les variantes utiles d'un nom pour le matching :
+    - le nom complet
+    - le contenu de chaque parenthèse (nom commercial dans SIRENE : "DUPONT (LA BRASSERIE VERTE)")
+    - le préfixe avant la première parenthèse (raison sociale brute)
+    """
+    if not nom:
+        return []
+    nom = nom.lower()
+    variantes = {nom}
+    # Contenu des parenthèses
+    for m in _re_match.findall(r"\(([^)]+)\)", nom):
+        variantes.add(m.strip())
+    # Préfixe avant la première parenthèse
+    if "(" in nom:
+        variantes.add(nom.split("(")[0].strip())
+    return [v for v in variantes if v]
+
+
 def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dict], cle_label: str) -> None:
-    """Modifie producteurs en place : ajoute un drapeau `cle_label` + l'URL de fiche label."""
+    """Modifie producteurs en place : ajoute un drapeau `cle_label` + l'URL de fiche label.
+
+    Matching robuste : on essaie toutes les variantes du nom SIRENE (raison sociale brute,
+    nom commercial entre parenthèses, nom complet) contre le nom du label.
+    Bonus si même commune.
+    """
     for item in items_label:
         nom_l = (item.get("nom") or "").lower()
         commune_l = (item.get("commune") or "").lower()
@@ -204,16 +236,17 @@ def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dic
             if siret_l and p.get("siret") == siret_l:
                 best_idx, best_score = i, 100
                 break
-            nom_p = (p.get("nom_complet") or "").lower()
             commune_p = (p.get("commune") or "").lower()
-            score = fuzz.token_set_ratio(nom_l, nom_p)
-            if commune_l and commune_p and commune_l == commune_p:
-                score = min(100, score + 10)
-            if score > best_score:
-                best_idx, best_score = i, score
+            # On teste TOUTES les variantes du nom SIRENE
+            variantes = _noms_alternatifs(p.get("nom_complet") or "")
+            for variante in variantes:
+                score = fuzz.token_set_ratio(nom_l, variante)
+                if commune_l and commune_p and commune_l == commune_p:
+                    score = min(100, score + 10)
+                if score > best_score:
+                    best_idx, best_score = i, score
         if best_idx >= 0 and best_score >= 85:
             producteurs[best_idx][cle_label] = True
-            # Stocke aussi l'URL de la fiche label si dispo (pour cliquer dans le rapport)
             url_fiche = item.get("url_fiche")
             if url_fiche:
                 producteurs[best_idx][f"url_{cle_label}"] = url_fiche
@@ -590,6 +623,38 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
 
     # LayerControl : cases à cocher en haut à droite pour activer/désactiver chaque catégorie
     folium.LayerControl(collapsed=False, position="topright").add_to(m)
+
+    # Mini-script JS : ajoute des liens "Tout cocher" / "Tout décocher" au-dessus du LayerControl
+    script_filtres = """
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            var ctrl = document.querySelector('.leaflet-control-layers-list');
+            if (!ctrl) return;
+            var overlays = document.querySelector('.leaflet-control-layers-overlays');
+            if (!overlays) return;
+            var bar = document.createElement('div');
+            bar.style.cssText = 'border-bottom:1px solid #ccc; padding:4px 0; margin-bottom:4px; font-size:12px;';
+            bar.innerHTML = '<a href="#" id="check-all-cats" style="color:#E2001A; margin-right:8px;">Tout cocher</a>'
+                          + '<a href="#" id="uncheck-all-cats" style="color:#E2001A;">Tout décocher</a>';
+            overlays.parentNode.insertBefore(bar, overlays);
+            document.getElementById('check-all-cats').onclick = function(e) {
+                e.preventDefault();
+                overlays.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
+                    if (!cb.checked) cb.click();
+                });
+            };
+            document.getElementById('uncheck-all-cats').onclick = function(e) {
+                e.preventDefault();
+                overlays.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
+                    if (cb.checked) cb.click();
+                });
+            };
+        }, 500);
+    });
+    </script>
+    """
+    m.get_root().html.add_child(folium.Element(script_filtres))
 
     # Légende fixe en bas à gauche (couleurs)
     legende = "<div style='position: fixed; bottom: 30px; left: 30px; background: white; padding: 10px; border: 1px solid #888; z-index: 9999; font-size: 12px; max-width: 220px;'>"
