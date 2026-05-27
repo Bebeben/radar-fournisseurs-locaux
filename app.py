@@ -423,26 +423,25 @@ if run_clicked:
     if "_individuels" in naf_effectif:
         cats_actives["_individuels"] = True
 
-    status = st.status("Interrogation des sources en cours...", expanded=True)
-    # Liste pour accumuler les logs et les afficher dans le status
+    st.subheader("Progression du run")
+    st.caption("Géocodage + SIRENE (50+ codes NAF × départements) + scraping labels régionaux. "
+               "Premier run : 2-4 min. Runs suivants : cache → quelques secondes.")
+    log_placeholder = st.empty()
     logs_progression: list[str] = []
-    log_placeholder = status.empty()
 
     def log_cb(msg: str):
         logs_progression.append(msg)
-        # Affiche les 20 dernières lignes pour ne pas saturer
-        log_placeholder.code("\n".join(logs_progression[-20:]), language="text")
+        # Affiche les 40 dernières lignes — défile en temps réel comme dans PowerShell
+        log_placeholder.code("\n".join(logs_progression[-40:]), language="text")
 
     try:
-        with status:
-            st.write("Géocodage + SIRENE (50+ codes NAF × départements) + scraping labels régionaux.")
-            st.write("Premier run : 2-4 min. Runs suivants : quelques secondes (cache).")
-            df = radar.run(config, naf_effectif, verbose=False, log_cb=log_cb)
-        status.update(label=f"Run terminé : {len(df)} producteurs", state="complete")
+        df = radar.run(config, naf_effectif, verbose=False, log_cb=log_cb)
     except Exception as e:
-        status.update(label="Erreur", state="error")
         st.error(f"Erreur pendant le run : {e}")
         st.stop()
+    # Log final visible
+    logs_progression.append(f"=== Run terminé : {len(df)} producteurs ===")
+    log_placeholder.code("\n".join(logs_progression[-40:]), language="text")
 
     st.success(f"{len(df)} producteurs trouvés dans un rayon de {rayon} km.")
 
