@@ -246,40 +246,53 @@ def _noms_alternatifs(nom: str) -> list[str]:
 def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dict], cle_label: str) -> None:
     """Tag les producteurs SIRENE qui correspondent à un item label.
 
-    Matching strict pour éviter les faux positifs :
-    - Seuil de base 90 (au lieu de 85)
-    - Bonus commune +5 seulement (au lieu de +10)
-    - Variantes du nom SIRENE testées (raison sociale + nom commercial entre parenthèses)
-    - Normalisation : suppression des préfixes juridiques (GAEC, EARL, SARL...) et civilités
-    - Filtrage des noms trop courts (< 4 caractères) qui matchent par hasard
+    Règles anti-faux-positifs :
+    - Match SIRET → 100 % sûr, tag.
+    - Sinon match nom (token_set_ratio) :
+        - Si MÊME COMMUNE entre SIRENE et label → seuil 88 (laxiste sur orthographe nom)
+        - Si commune différente ou inconnue → seuil 95 (très strict)
+    - Normalisation : retrait des préfixes (GAEC, EARL, SARL...) + civilités (Mr, Mme...)
+    - Noms < 4 caractères ignorés (faux positifs trop probables)
     """
-    SEUIL_MATCH = 90
-    BONUS_COMMUNE = 5
+    SEUIL_MEME_COMMUNE = 88
+    SEUIL_COMMUNE_DIFF = 95
+
     for item in items_label:
-        nom_l_raw = (item.get("nom") or "").lower()
         nom_l = _normaliser_nom(item.get("nom") or "")
-        commune_l = (item.get("commune") or "").lower()
+        commune_l = (item.get("commune") or "").lower().strip()
         siret_l = (item.get("siret") or "")
         if not nom_l or len(nom_l) < 4:
             continue
-        best_idx, best_score = -1, 0
+
+        best_idx, best_score, best_meme_commune = -1, 0, False
         for i, p in enumerate(producteurs):
+            # Match SIRET = sûr et définitif
             if siret_l and p.get("siret") == siret_l:
-                best_idx, best_score = i, 100
+                best_idx, best_score, best_meme_commune = i, 100, True
                 break
-            commune_p = (p.get("commune") or "").lower()
+            commune_p = (p.get("commune") or "").lower().strip()
+            meme_commune = bool(commune_l and commune_p and commune_l == commune_p)
             variantes = _noms_alternatifs(p.get("nom_complet") or "")
             for variante in variantes:
+                if len(variante) < 4:
+                    continue
                 score = fuzz.token_set_ratio(nom_l, variante)
-                if commune_l and commune_p and commune_l == commune_p:
-                    score = min(100, score + BONUS_COMMUNE)
-                if score > best_score:
-                    best_idx, best_score = i, score
-        if best_idx >= 0 and best_score >= SEUIL_MATCH:
-            producteurs[best_idx][cle_label] = True
-            url_fiche = item.get("url_fiche")
-            if url_fiche:
-                producteurs[best_idx][f"url_{cle_label}"] = url_fiche
+                # On prend le meilleur score, en mémorisant si la commune correspond
+                if score > best_score or (score == best_score and meme_commune and not best_meme_commune):
+                    best_idx, best_score, best_meme_commune = i, score, meme_commune
+
+        # Décision finale
+        if best_idx < 0:
+            continue
+        seuil_applicable = SEUIL_MEME_COMMUNE if best_meme_commune else SEUIL_COMMUNE_DIFF
+        if best_score < seuil_applicable:
+            continue
+        producteurs[best_idx][cle_label] = True
+        url_fiche = item.get("url_fiche")
+        if url_fiche:
+            producteurs[best_idx][f"url_{cle_label}"] = url_fiche
+        # On stocke aussi le nom scrapé côté label pour vérification visuelle
+        producteurs[best_idx][f"nom_label_{cle_label.replace('label_', '')}"] = item.get("nom", "")
 
 
 def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: list[dict],

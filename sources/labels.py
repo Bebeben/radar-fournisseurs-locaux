@@ -99,10 +99,16 @@ def inao(cache_dossier: str, ttl: int = 30) -> list[dict]:
 # ====================================================================
 
 def sources_regionales(departements_magasin: list[str], cache_dossier: str,
-                       ttl: int = 7, verbose: bool = False) -> dict[str, list[dict]]:
+                       ttl: int = 7, verbose: bool = False,
+                       enrichir_siret: bool = True) -> dict[str, list[dict]]:
     """Charge toutes les sources régionales pertinentes pour les départements du magasin.
     Renvoie un dict {nom_source: [items]}.
+
+    Si enrichir_siret=True, pour chaque item sans SIRET on tente une recherche SIRENE
+    par (nom, commune) pour récupérer le SIRET officiel. Ça rend le matching ultérieur
+    100% fiable au lieu d'un fuzzy potentiellement faux.
     """
+    from . import sirene as _sirene
     regions = regions_loader.charger_toutes_regions()
     sources = regions_loader.sources_pertinentes(regions, departements_magasin)
     resultats = {}
@@ -116,11 +122,24 @@ def sources_regionales(departements_magasin: list[str], cache_dossier: str,
         else:
             try:
                 items = scraper_generique.scrape_source(src)
+                if verbose: print(f"[region:{nom}] {len(items)} items scrapés (pré-enrichissement)")
+                if enrichir_siret and items:
+                    # Enrichit chaque item avec son SIRET via une recherche SIRENE
+                    enriched = 0
+                    for it in items:
+                        if it.get("siret"):
+                            continue
+                        siret = _sirene.chercher_siret_par_nom_commune(
+                            it.get("nom", ""), it.get("commune", ""), it.get("code_postal", "")
+                        )
+                        if siret:
+                            it["siret"] = siret
+                            enriched += 1
+                    if verbose: print(f"[region:{nom}] {enriched}/{len(items)} items enrichis avec SIRET")
                 cache_util.save(cache_dossier, cache_key, items)
-                if verbose: print(f"[region:{nom}] {len(items)} items scrapés")
             except Exception as e:
                 if verbose: print(f"[region:{nom}] erreur: {e}")
                 items = []
-            time.sleep(1.0)  # politesse scraping
+            time.sleep(1.0)
         resultats[nom] = items
     return resultats

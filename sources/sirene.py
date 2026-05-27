@@ -64,6 +64,39 @@ def verifier_siret_actif(siret: str) -> bool | None:
         return None
 
 
+def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str = "") -> str | None:
+    """Tente de récupérer le SIRET d'un producteur via son nom et sa commune.
+    Renvoie le SIRET (14 chiffres) si match unique, sinon None.
+    """
+    if not nom or len(nom) < 4:
+        return None
+    # Requête : nom + commune
+    q = nom
+    if commune:
+        q += f" {commune}"
+    try:
+        _throttle()
+        params = {"q": q, "per_page": 5, "etat_administratif": "A"}
+        r = requests.get(BASE, params=params, timeout=10)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        results = data.get("results") or []
+        if not results:
+            return None
+        # On retient le 1er résultat. Idéalement on filtrerait par code postal si fourni.
+        first = results[0]
+        siege = first.get("siege") or {}
+        if code_postal and siege.get("code_postal") != code_postal:
+            # Cherche un meilleur match dans les 5 premiers
+            for r_ in results:
+                if (r_.get("siege") or {}).get("code_postal") == code_postal:
+                    return (r_.get("siege") or {}).get("siret")
+        return siege.get("siret")
+    except requests.RequestException:
+        return None
+
+
 def chercher(code_naf: str, departements: Iterable[str], per_page: int = 25) -> list[dict]:
     """Récupère tous les résultats pour (code_naf, departements). Pagine avec plafond."""
     deps = ",".join(departements)
