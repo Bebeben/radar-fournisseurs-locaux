@@ -163,47 +163,50 @@ villes = charger_villes()
 # --------- Sidebar : paramètres magasin ----------
 with st.sidebar:
     st.header("Magasin")
-    nom = st.text_input("Nom du magasin (libre)", "Super U Saint-Benoît-du-Sault")
+    query = st.text_input("Commune", "Saint-Benoît-du-Sault", key="ville_search",
+                           help="Tape le nom de la commune (≥ 2 lettres). "
+                                "L'app suggère les correspondances officielles.")
     rayon = st.slider("Rayon (km)", 5, 100, 30)
 
-    # Autocomplete ville via API Adresse
-    st.caption("Tape un nom de commune (≥ 2 lettres) :")
-    query = st.text_input("Recherche commune", "Saint-Benoît-du-Sault", key="ville_search")
     suggestions = chercher_communes(query)
-
+    ville_choisie = None
     deps_auto: list[str] = []
-    if suggestions:
+
+    if not suggestions:
+        if query and len(query) >= 2:
+            st.warning("Aucune commune trouvée. Vérifie l'orthographe.")
+        adresse = query if query else "Saint-Benoît-du-Sault, 36170"
+        deps_default = "36,87,23"
+        nom = f"Super U {query}" if query else "Super U"
+    elif len(suggestions) == 1:
+        # Pas d'ambiguïté : on prend direct
+        ville_choisie = suggestions[0]
+    else:
+        # Plusieurs candidates : selectbox de désambiguïsation
         labels_suggest = [s["label"] for s in suggestions]
-        choix_idx = st.selectbox("Choisir la bonne commune",
+        choix_idx = st.selectbox("Plusieurs communes correspondent — choisis :",
                                   options=list(range(len(suggestions))),
                                   format_func=lambda i: labels_suggest[i],
-                                  index=0,
-                                  key="ville_choix")
+                                  index=0, key="ville_choix")
         ville_choisie = suggestions[choix_idx]
+
+    if ville_choisie:
         adresse = f"{ville_choisie['city']}, {ville_choisie['postcode']}"
-        # Auto-détection des départements voisins
+        nom = f"Super U {ville_choisie['city']}"
         if ville_choisie.get("lat") and ville_choisie.get("lon"):
             deps_auto = departements_dans_rayon(
                 ville_choisie["lat"], ville_choisie["lon"], rayon, marge_km=80,
             )
-        st.success(
-            f"Sélectionnée : **{ville_choisie['city']}** ({ville_choisie['postcode']}) "
-            f"— dpt {ville_choisie['departement']} · "
-            f"voisins auto : {', '.join(deps_auto) if deps_auto else '(aucun)'}"
-        )
         deps_default = ",".join(deps_auto) if deps_auto else ville_choisie["departement"]
-    else:
-        adresse = query if query else "Saint-Benoît-du-Sault, 36170"
-        deps_default = "36,87,23"
-        if query and len(query) >= 2:
-            st.warning("Aucune commune trouvée. Tape les premières lettres du nom officiel.")
+        st.caption(
+            f"📍 **{ville_choisie['city']}** ({ville_choisie['postcode']}) — dpt {ville_choisie['departement']}"
+        )
 
     deps_input = st.text_input(
         "Départements à interroger",
         deps_default,
-        help="Pré-rempli automatiquement avec les départements dont la préfecture est dans "
-             "ton rayon + 80 km de marge (généreux pour couvrir les frontières). "
-             "Tu peux modifier la liste à la main si besoin.",
+        help="Pré-rempli avec les départements dont la préfecture est dans "
+             "ton rayon + 80 km. Tu peux modifier la liste si besoin.",
     )
 
     with st.expander("Charger un preset (Saint-Benoît, Les Pieux, Vaucresson...)"):
