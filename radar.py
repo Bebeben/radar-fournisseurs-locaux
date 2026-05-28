@@ -335,10 +335,13 @@ def _appliquer_tag(producteur: dict, cle_label: str, item: dict) -> None:
 def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: list[dict],
                                          cle_label: str, mag_lat: float, mag_lon: float,
                                          rayon_km: float, categorie: str = "inconnu",
-                                         verifier_actifs: bool = True) -> int:
+                                         verifier_actifs: bool = True,
+                                         naf_map: dict | None = None) -> int:
     """Ajoute les items label qui n'ont matché aucun producteur SIRENE.
     Filtre par distance si l'item a des coordonnées.
     Si verifier_actifs=True ET l'item a un SIRET, vérifie qu'il est actif (évite les fermés).
+    Si l'item a été enrichi avec un code_naf (via SIRENE), on le catégorise correctement
+    au lieu de 'inconnu'.
     """
     from sources import sirene as _sirene
     n_ajoutes = 0
@@ -368,12 +371,17 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
                 n_fermes += 1
                 continue
         url_fiche = item.get("url_fiche", "")
+        # Catégorisation : si l'item a un NAF (enrichi via SIRENE), on l'utilise ; sinon 'inconnu'
+        naf_item = item.get("code_naf", "")
+        cat_item = categorie
+        if naf_item and naf_map:
+            cat_item = categorie_pour_naf(naf_item, naf_map)
         nouveau = {
-            "siren": "",
+            "siren": item.get("siren", ""),
             "siret": item.get("siret", ""),
             "nom_complet": nom,
-            "code_naf": "",
-            "libelle_naf": "",
+            "code_naf": naf_item,
+            "libelle_naf": item.get("libelle_naf", ""),
             "categorie_entreprise": "",
             "tranche_effectif": "",
             "etat_administratif": "",
@@ -387,12 +395,12 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
             "est_societe_mission": False,
             "est_ess": False,
             "est_entrepreneur_individuel": False,
-            "dirigeant_principal": "",
-            "site_web": "",
+            "dirigeant_principal": item.get("dirigeant_principal", ""),
+            "site_web": item.get("site_web", ""),
             "telephone": "",
             "email": "",
-            "fiche_annuaire": "",
-            "categorie": categorie,
+            "fiche_annuaire": item.get("fiche_annuaire", ""),
+            "categorie": cat_item,
             "distance_km": dist,
             "source_label_seul": True,
             cle_label: True,
@@ -530,7 +538,7 @@ def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.Da
                 n_tag = matcher_label_sur_producteurs(producteurs, items, cle_label)
                 # Items qui n'ont pas matché → ajoutés en orphelins si dans le rayon
                 n_orph = ajouter_producteurs_label_orphelins(
-                    producteurs, items, cle_label, lat, lon, rayon
+                    producteurs, items, cle_label, lat, lon, rayon, naf_map=naf_map
                 )
                 _log(f"[{nom_source}] {len(items)} items : {n_tag} tagués sur SIRENE, {n_orph} orphelins ajoutés")
         except Exception as e:

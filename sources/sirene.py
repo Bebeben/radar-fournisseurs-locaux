@@ -64,6 +64,53 @@ def verifier_siret_actif(siret: str) -> bool | None:
         return None
 
 
+def chercher_entreprise_par_nom_commune(nom: str, commune: str = "", code_postal: str = "",
+                                        departement: str = "") -> dict | None:
+    """Comme chercher_siret_par_nom_commune mais renvoie la fiche SIRENE NORMALISÉE complète
+    (siret + code NAF + libellé + dirigeant + coordonnées) au lieu du seul SIRET.
+    Permet de catégoriser un orphelin label au lieu de le laisser en 'inconnu'.
+    """
+    if not nom or len(nom) < 4:
+        return None
+    try:
+        from rapidfuzz import fuzz
+    except ImportError:
+        fuzz = None
+
+    q = nom + (f" {commune}" if commune else "")
+    try:
+        _throttle()
+        params = {"q": q, "per_page": 5, "etat_administratif": "A"}
+        if departement:
+            params["departement"] = departement
+        r = requests.get(BASE, params=params, timeout=10)
+        if r.status_code != 200:
+            return None
+        results = (r.json() or {}).get("results") or []
+        if not results:
+            return None
+
+        nom_lower = nom.lower()
+        commune_lower = (commune or "").lower()
+        for r_ in results:
+            siege = r_.get("siege") or {}
+            nom_sirene = (r_.get("nom_complet") or "").lower()
+            commune_sirene = (siege.get("libelle_commune") or "").lower()
+            cp_sirene = siege.get("code_postal") or ""
+            if code_postal and cp_sirene != code_postal:
+                continue
+            if commune_lower and commune_sirene and commune_lower != commune_sirene:
+                continue
+            seuil = 78 if (commune or code_postal) else 88
+            if fuzz:
+                if fuzz.token_set_ratio(nom_lower, nom_sirene) < seuil:
+                    continue
+            return extraire_normalise(r_)
+        return None
+    except requests.RequestException:
+        return None
+
+
 def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str = "",
                                    departement: str = "") -> str | None:
     """Tente de récupérer le SIRET d'un producteur via son nom et sa commune (ou département).

@@ -156,12 +156,25 @@ def sources_regionales(departements_magasin: list[str], cache_dossier: str,
                     geocoded = 0
                     for it in items:
                         if not it.get("siret"):
-                            siret = _sirene.chercher_siret_par_nom_commune(
+                            fiche = _sirene.chercher_entreprise_par_nom_commune(
                                 it.get("nom", ""), it.get("commune", ""),
                                 it.get("code_postal", ""), departement=dep_src,
                             )
-                            if siret:
-                                it["siret"] = siret
+                            if fiche and fiche.get("siret"):
+                                it["siret"] = fiche["siret"]
+                                # Enrichit avec NAF + libellé + dirigeant + coords SIRENE
+                                it["code_naf"] = fiche.get("code_naf", "")
+                                it["libelle_naf"] = fiche.get("libelle_naf", "")
+                                it["dirigeant_principal"] = fiche.get("dirigeant_principal", "")
+                                it["siren"] = fiche.get("siren", "")
+                                it["site_web"] = fiche.get("site_web", "")
+                                it["fiche_annuaire"] = fiche.get("fiche_annuaire", "")
+                                if fiche.get("latitude") and fiche.get("longitude"):
+                                    it["latitude"] = fiche["latitude"]
+                                    it["longitude"] = fiche["longitude"]
+                                if not it.get("commune") and fiche.get("commune"):
+                                    it["commune"] = fiche["commune"]
+                                    it["code_postal"] = fiche.get("code_postal", "")
                                 enriched += 1
                         # Géocodage si pas de coordonnées (permet filtrage rayon pour orphelins)
                         if not (it.get("latitude") and it.get("longitude")):
