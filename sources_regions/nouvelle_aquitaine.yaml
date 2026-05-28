@@ -13,7 +13,7 @@ sources:
     url: "https://www.producteurs-fermiers-pays-basque.fr/"
     departements_specifiques: ["64"]
   - nom: "visit_limousin_87"
-    description: "Visit Limousin — annuaire producteurs Haute-Vienne (OT Limousin). NOTE: paginé, on ne capture que la page 1 (~12 producteurs)."
+    description: "Visit Limousin — producteurs Haute-Vienne (OT Limousin). Noms nettoyés (dates/catégories retirées). Matching via SIRET trouvé par recherche nom (commune absente de la liste)."
     url: "https://www.visitlimousin.com/sejourner/faire-son-marche/producteurs-locaux-en-haute-vienne/?listpage=1"
     config:
       selecteur_lien: "article.item_sheet"

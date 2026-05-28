@@ -474,7 +474,24 @@ if run_clicked:
 
     # Tableau complet
     st.subheader("Producteurs (triés par catégorie puis distance)")
-    st.dataframe(df, width="stretch", hide_index=True, height=400)
+    # Réordonne les colonnes utiles en tête + rend les URLs cliquables
+    cols_tete = [c for c in [
+        "nom_complet", "categorie", "distance_km", "commune", "code_postal",
+        "labels", "fiche_label", "site_web", "telephone", "fiche_annuaire",
+        "score_pertinence", "score_detail", "code_naf", "libelle_naf",
+        "dirigeant_principal", "siren",
+    ] if c in df.columns]
+    autres = [c for c in df.columns if c not in cols_tete]
+    df_aff = df[cols_tete + autres]
+
+    col_config = {
+        "fiche_label": st.column_config.LinkColumn("Fiche label", display_text="Voir la fiche"),
+        "fiche_annuaire": st.column_config.LinkColumn("Annuaire entreprises", display_text="Voir"),
+        "site_web": st.column_config.LinkColumn("Site web"),
+        "labels": st.column_config.TextColumn("Labels"),
+        "score_detail": st.column_config.TextColumn("Détail score", width="medium"),
+    }
+    st.dataframe(df_aff, width="stretch", hide_index=True, height=400, column_config=col_config)
 
     # Carte
     st.subheader("Carte")

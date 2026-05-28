@@ -37,6 +37,22 @@ RE_BRUIT_FIN_NOM = re.compile(
     r"\s*(?:En savoir \+?|Découvrir|Voir la fiche|Lire la suite|>>|→).*$",
     re.IGNORECASE,
 )
+# Préfixe "Du 1 Janvier au 31 Décembre" (plages d'ouverture, ex. Visit Limousin)
+RE_DATE_PREFIX = re.compile(
+    r"^\s*Du\s+\d{1,2}\s+\w+\s+au\s+\d{1,2}\s+\w+\s+", re.IGNORECASE,
+)
+# Catégories en MAJUSCULES qui suivent le nom (ex. Visit Limousin) → on coupe le nom avant
+_CATS_MAJ = [
+    "BIÈRES", "BIERES", "FRUITS / LÉGUMES", "FRUITS / LEGUMES", "FRUITS", "LÉGUMES", "LEGUMES",
+    "CONFISERIE / CHOCOLAT", "CONFISERIE", "CHOCOLAT", "PLANTES AROMATIQUES", "PLANTES",
+    "AROMATIQUES", "VIANDES", "VIANDE", "FROMAGES", "FROMAGE", "PRODUITS LAITIERS",
+    "MIEL", "PRODUIT APICOLE", "PRODUITS APICOLES", "PRODUITS DE LA RUCHE",
+    "ÉPICERIE", "EPICERIE", "ÉPICE", "EPICE", "ÉPICES", "EPICES",
+    "SAFRAN", "HUILES", "HUILE", "VINS", "ESCARGOTS", "CHAMPIGNONS", "PRODUITS LOCAUX",
+    "FOIE GRAS", "PRODUITS DE LA FERME", "BOISSONS", "JUS", "PAIN", "BOULANGERIE",
+    "PÂTISSERIE", "PATISSERIE", "OEUFS", "ŒUFS", "VOLAILLES", "VOLAILLE",
+]
+RE_CAT_MAJ = re.compile(r"\s+(?:" + "|".join(re.escape(c) for c in _CATS_MAJ) + r")\b")
 
 
 def extraire_commune_cp(texte: str) -> tuple[str, str]:
@@ -58,11 +74,20 @@ def extraire_commune_cp(texte: str) -> tuple[str, str]:
 
 
 def nettoyer_nom(nom: str) -> str:
-    """Vire le bruit en fin de nom (En savoir +, etc.) et limite la longueur."""
+    """Nettoie un nom scrapé :
+    - vire le préfixe de dates d'ouverture ("Du 1 Janvier au 31 Décembre")
+    - coupe à la catégorie en MAJUSCULES qui suit le nom (BIÈRES, FRUITS / LÉGUMES...)
+    - vire le bruit de fin (En savoir +, etc.)
+    """
     if not nom:
         return ""
-    nom = RE_BRUIT_FIN_NOM.sub("", nom).strip()
-    return nom[:120].strip(" ,-")
+    nom = RE_DATE_PREFIX.sub("", nom)
+    nom = RE_BRUIT_FIN_NOM.sub("", nom)
+    # Coupe à la première catégorie MAJUSCULES (le nom vient avant)
+    m = RE_CAT_MAJ.search(nom)
+    if m and m.start() > 3:
+        nom = nom[:m.start()]
+    return nom.strip(" ,-·")[:120]
 
 
 def fetch_html(url: str, timeout: int = 10) -> str | None:

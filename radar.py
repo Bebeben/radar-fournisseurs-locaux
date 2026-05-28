@@ -282,6 +282,10 @@ def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dic
         siret_l = (item.get("siret") or "")
         if not nom_l or len(nom_l) < 4:
             continue
+        # Garde-fou : sans commune ET sans SIRET, on ne peut pas matcher de façon fiable
+        # (les noms seuls produisent des faux positifs). On skip cet item.
+        if not commune_l and not siret_l:
+            continue
         tokens_l = _tokens_significatifs(nom_l)
 
         for i, p in enumerate(producteurs):
@@ -532,11 +536,24 @@ def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.Da
         except Exception as e:
             _log(f"[regions] erreur: {e}")
 
-    # 5. Score
+    # 5. Score + colonnes consolidées labels (lisibles + lien cliquable)
     for p in producteurs:
         score, detail = calculer_score(p)
         p["score_pertinence"] = score
         p["score_detail"] = " · ".join(detail) if detail else "(aucun signal)"
+
+        # Consolidation des labels matchés : texte + première URL pour la colonne cliquable
+        labels_noms = []
+        premiere_url = ""
+        for k in list(p.keys()):
+            if isinstance(k, str) and k.startswith("label_") and p.get(k):
+                nom_lbl = k.replace("label_", "").replace("_", " ")
+                labels_noms.append(nom_lbl)
+                url = p.get(f"url_{k}", "")
+                if url and not premiere_url:
+                    premiere_url = url
+        p["labels"] = " · ".join(labels_noms) if labels_noms else ""
+        p["fiche_label"] = premiere_url
 
     # 5bis. Mode premium : on coupe les producteurs sans aucun signal de vente directe
     mode = filtres.get("mode", "premium")
@@ -568,10 +585,11 @@ def export_excel(df: pd.DataFrame, path: str) -> None:
         return
     colonnes_principales = [
         "categorie", "nom_complet", "distance_km", "commune", "code_postal", "adresse",
+        "labels", "fiche_label",
         "site_web", "telephone", "email", "fiche_annuaire",
         "code_naf", "libelle_naf", "categorie_entreprise", "tranche_effectif",
         "est_bio", "est_patrimoine_vivant", "est_entrepreneur_individuel",
-        "score_pertinence", "dirigeant_principal", "siren", "siret",
+        "score_pertinence", "score_detail", "dirigeant_principal", "siren", "siret",
         "source_label_seul", "a_contacter",
     ]
     # Colonnes labels (booléens) — toujours présentes même vides
