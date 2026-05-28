@@ -149,13 +149,16 @@ def sources_regionales(departements_magasin: list[str], cache_dossier: str,
                 items = scraper_generique.scrape_source(src)
                 if verbose: print(f"[region:{nom}] {len(items)} items scrapés (pré-enrichissement)")
                 if enrichir_siret and items:
-                    # Enrichit chaque item avec son SIRET via une recherche SIRENE
+                    # Département de la source (pour filtrer la recherche SIRET quand pas de commune)
+                    deps_src = src.get("departements_specifiques") or []
+                    dep_src = deps_src[0] if deps_src else ""
                     enriched = 0
                     geocoded = 0
                     for it in items:
                         if not it.get("siret"):
                             siret = _sirene.chercher_siret_par_nom_commune(
-                                it.get("nom", ""), it.get("commune", ""), it.get("code_postal", "")
+                                it.get("nom", ""), it.get("commune", ""),
+                                it.get("code_postal", ""), departement=dep_src,
                             )
                             if siret:
                                 it["siret"] = siret

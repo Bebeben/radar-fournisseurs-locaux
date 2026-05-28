@@ -1,12 +1,7 @@
 region: "France entière (marques transversales)"
-# Liste vide de départements = marques actives partout
 departements: []
-sources:
-  - nom: "esprit_parc_national"
-    description: "Esprit Parc National — 10 parcs nationaux (hexagone + DOM), ~700 bénéficiaires"
-    url: "https://www.espritparcnational.com/"
-  - nom: "valeurs_parc_pnr"
-    description: "Valeurs Parc Naturel Régional — 58 PNR en France"
-    url: "https://www.parcs-naturels-regionaux.fr/"
-  # Bienvenue à la Ferme : JS dynamique, à activer si on trouve l'API JSON
-  # Marchés des Producteurs de Pays : pareil, déclinaisons départementales à scraper si besoin
+# Esprit Parc National et Valeurs Parc PNR DÉSACTIVÉS : leurs pages d'accueil ne listent
+# pas les producteurs (annuaires éclatés par parc, chargés en JavaScript). Le scrape ne
+# remontait qu'1 item (le titre du site) ou du bruit. À réactiver seulement si on trouve
+# une URL d'annuaire structurée par parc.
+sources: []

@@ -567,6 +567,11 @@ def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.Da
     # 7. DataFrame trié — score décroissant puis distance croissante (les meilleurs en haut)
     df = pd.DataFrame(producteurs)
     if not df.empty:
+        # IMPORTANT : remplir les colonnes label_* avec False (sinon NaN, et `if NaN` est True
+        # en Python → bug d'affichage où tous les producteurs apparaissent dans chaque filtre label)
+        for col in df.columns:
+            if isinstance(col, str) and col.startswith("label_"):
+                df[col] = df[col].fillna(False).astype(bool)
         df = df.sort_values(
             ["score_pertinence", "distance_km"],
             ascending=[False, True], na_position="last",

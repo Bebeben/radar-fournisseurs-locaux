@@ -64,13 +64,14 @@ def verifier_siret_actif(siret: str) -> bool | None:
         return None
 
 
-def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str = "") -> str | None:
-    """Tente de récupérer le SIRET d'un producteur via son nom et sa commune.
+def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str = "",
+                                   departement: str = "") -> str | None:
+    """Tente de récupérer le SIRET d'un producteur via son nom et sa commune (ou département).
 
     Renvoie le SIRET (14 chiffres) UNIQUEMENT si :
     - L'API trouve un résultat
-    - Le nom du résultat SIRENE est cohérent avec le nom cherché (fuzzy >= 75)
-    - La commune ou le code postal correspondent
+    - Le nom du résultat SIRENE est cohérent avec le nom cherché (fuzzy >= 78)
+    - La commune / code postal / département correspondent
 
     Si aucun résultat ne passe ces critères, renvoie None (ne pas inventer un faux SIRET).
     """
@@ -85,6 +86,8 @@ def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str
     try:
         _throttle()
         params = {"q": q, "per_page": 5, "etat_administratif": "A"}
+        if departement:
+            params["departement"] = departement
         r = requests.get(BASE, params=params, timeout=10)
         if r.status_code != 200:
             return None
@@ -102,17 +105,18 @@ def chercher_siret_par_nom_commune(nom: str, commune: str = "", code_postal: str
             commune_sirene = (siege.get("libelle_commune") or "").lower()
             cp_sirene = siege.get("code_postal") or ""
 
-            # Vérif 1 : commune / code postal cohérent
+            # Vérif commune / code postal cohérent (si fournis)
             if code_postal and cp_sirene != code_postal:
                 continue
             if commune_lower and commune_sirene and commune_lower != commune_sirene:
-                # Si on a fourni une commune et qu'elle ne matche pas, on rejette
                 continue
 
-            # Vérif 2 : le nom doit ressembler (fuzzy >= 75)
+            # Vérif nom : seuil 78 (un peu plus strict). Sans commune (recherche par dpt seul),
+            # on exige un meilleur score pour compenser l'absence de filtre géographique fin.
+            seuil = 78 if (commune or code_postal) else 88
             if fuzz:
                 score = fuzz.token_set_ratio(nom_lower, nom_sirene)
-                if score < 75:
+                if score < seuil:
                     continue
 
             siret = siege.get("siret")

@@ -73,6 +73,28 @@ def extraire_commune_cp(texte: str) -> tuple[str, str]:
     return "", ""
 
 
+# Mots/expressions qui trahissent un item de bruit (article, nav, page) — pas un producteur
+_MOTS_BRUIT = re.compile(
+    r"(date de cr[ée]ation|inspirations?|vacances|actualit[ée]s?|newsletter|"
+    r"abonnez-vous|connexion|mentions l[ée]gales|cookies?|panier|recherche|"
+    r"d[ée]couvrez nos|tous les|voir tous|page \d|accueil|menu|navigation|"
+    r"r[ée]sultats?|filtrer|trier|chargement)",
+    re.IGNORECASE,
+)
+
+
+def est_bruit(nom: str) -> bool:
+    """Détecte si un nom scrapé est en réalité du bruit (titre d'article, élément de nav...)."""
+    if not nom or len(nom) < 3:
+        return True
+    if _MOTS_BRUIT.search(nom):
+        return True
+    # Une "phrase" (trop de mots) est probablement une description, pas un nom de producteur
+    if len(nom.split()) > 9:
+        return True
+    return False
+
+
 def nettoyer_nom(nom: str) -> str:
     """Nettoie un nom scrapé :
     - vire le préfixe de dates d'ouverture ("Du 1 Janvier au 31 Décembre")
@@ -167,7 +189,7 @@ def scrape_avec_config(html: str, config: dict, label_nom: str, base_url: str = 
                 if idx > 0:
                     nom = txt_complet[:idx].strip(" ,(-")
         nom = nettoyer_nom(re.sub(r"\s+", " ", nom))
-        if nom and len(nom) > 2:
+        if nom and len(nom) > 2 and not est_bruit(nom):
             out.append({
                 "nom": nom,
                 "commune": commune,
@@ -205,7 +227,7 @@ def scrape_auto(html: str, label_nom: str, base_url: str = "") -> list[dict]:
         txt = el.get_text(" ", strip=True)
         commune, cp = extraire_commune_cp(txt)
         nom = nettoyer_nom(re.sub(r"\s+", " ", nom))
-        if not nom or len(nom) < 3:
+        if not nom or len(nom) < 3 or est_bruit(nom):
             continue
         # URL de la fiche
         url_fiche = ""
