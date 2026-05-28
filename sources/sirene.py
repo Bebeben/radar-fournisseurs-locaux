@@ -64,6 +64,20 @@ def verifier_siret_actif(siret: str) -> bool | None:
         return None
 
 
+_MOTS_GENERIQUES = {
+    "ferme", "fermes", "domaine", "maison", "gaec", "earl", "scea", "sarl", "sas", "sasu",
+    "sci", "eurl", "ei", "les", "des", "du", "de", "la", "le", "saint", "sainte",
+    "apicole", "rucher", "brasserie", "fromagerie", "chevrerie", "exploitation",
+}
+
+
+def _tokens_sig(nom: str) -> set:
+    """Tokens significatifs d'un nom (≥4 char, hors mots génériques) pour matcher le nom de famille."""
+    import re as _re
+    toks = _re.split(r"[\s\-'’]+", (nom or "").lower())
+    return {t for t in toks if len(t) >= 4 and t not in _MOTS_GENERIQUES}
+
+
 def chercher_entreprise_par_nom_commune(nom: str, commune: str = "", code_postal: str = "",
                                         departement: str = "") -> dict | None:
     """Comme chercher_siret_par_nom_commune mais renvoie la fiche SIRENE NORMALISÉE complète
@@ -77,35 +91,61 @@ def chercher_entreprise_par_nom_commune(nom: str, commune: str = "", code_postal
     except ImportError:
         fuzz = None
 
-    q = nom + (f" {commune}" if commune else "")
+    # Deux requêtes possibles : nom complet, puis tokens distinctifs seuls (nom de famille).
+    # Car l'API fait un AND sur les mots : "Maison Apicole Oizon Prissac" → 0 résultat,
+    # alors que "Oizon Prissac" → trouve "HERVE OIZON".
+    tokens_q_list = sorted(_tokens_sig(nom))
+    requetes = []
+    if commune:
+        requetes.append(f"{nom} {commune}")
+        if tokens_q_list:
+            requetes.append(f"{' '.join(tokens_q_list)} {commune}")
+    else:
+        requetes.append(nom)
+        if tokens_q_list:
+            requetes.append(" ".join(tokens_q_list))
+
     try:
-        _throttle()
-        params = {"q": q, "per_page": 5, "etat_administratif": "A"}
-        if departement:
-            params["departement"] = departement
-        r = requests.get(BASE, params=params, timeout=10)
-        if r.status_code != 200:
-            return None
-        results = (r.json() or {}).get("results") or []
+        results = []
+        for q in requetes:
+            _throttle()
+            params = {"q": q, "per_page": 5, "etat_administratif": "A"}
+            if departement:
+                params["departement"] = departement
+            r = requests.get(BASE, params=params, timeout=10)
+            if r.status_code == 200:
+                results = (r.json() or {}).get("results") or []
+                if results:
+                    break
         if not results:
             return None
 
         nom_lower = nom.lower()
         commune_lower = (commune or "").lower()
+        tokens_q = _tokens_sig(nom)
         for r_ in results:
             siege = r_.get("siege") or {}
             nom_sirene = (r_.get("nom_complet") or "").lower()
             commune_sirene = (siege.get("libelle_commune") or "").lower()
             cp_sirene = siege.get("code_postal") or ""
-            if code_postal and cp_sirene != code_postal:
+            meme_lieu = False
+            if code_postal and cp_sirene == code_postal:
+                meme_lieu = True
+            elif commune_lower and commune_sirene and commune_lower == commune_sirene:
+                meme_lieu = True
+            elif code_postal and cp_sirene != code_postal:
                 continue
-            if commune_lower and commune_sirene and commune_lower != commune_sirene:
+            elif commune_lower and commune_sirene and commune_lower != commune_sirene:
                 continue
+
+            # Cas 1 : même lieu + token distinctif commun (ex. "oizon" dans les 2)
+            tokens_s = _tokens_sig(nom_sirene)
+            if meme_lieu and (tokens_q & tokens_s):
+                return extraire_normalise(r_)
+            # Cas 2 : nom très ressemblant (fuzzy)
             seuil = 78 if (commune or code_postal) else 88
-            if fuzz:
-                if fuzz.token_set_ratio(nom_lower, nom_sirene) < seuil:
-                    continue
-            return extraire_normalise(r_)
+            if fuzz and fuzz.token_set_ratio(nom_lower, nom_sirene) >= seuil:
+                return extraire_normalise(r_)
         return None
     except requests.RequestException:
         return None

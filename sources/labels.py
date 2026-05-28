@@ -148,6 +148,12 @@ def sources_regionales(departements_magasin: list[str], cache_dossier: str,
             try:
                 items = scraper_generique.scrape_source(src)
                 if verbose: print(f"[region:{nom}] {len(items)} items scrapés (pré-enrichissement)")
+                # Enrichissement Tourinsoft (sitemap → commune) si configuré
+                conf = src.get("config") or {}
+                if conf.get("sitemap_base"):
+                    from . import tourinsoft as _touri
+                    n_t = _touri.enrichir_items(items, conf, cache_dossier, ttl, verbose=verbose)
+                    if verbose: print(f"[region:{nom}] {n_t} items enrichis via sitemap Tourinsoft")
                 if enrichir_siret and items:
                     # Département de la source (pour filtrer la recherche SIRET quand pas de commune)
                     deps_src = src.get("departements_specifiques") or []

@@ -157,6 +157,7 @@ def scrape_avec_config(html: str, config: dict, label_nom: str, base_url: str = 
     sel_commune = config.get("selecteur_commune")
     utiliser_regex = config.get("regex_commune", True)
 
+    sheet_id_attr = config.get("sheet_id_attr")  # ex. "data-sheet-id" pour les sites Tourinsoft
     for el in soup.select(sel_lien):
         # URL de la fiche détaillée (très précieux pour Benjamin pour cliquer)
         url_fiche = ""
@@ -166,6 +167,8 @@ def scrape_avec_config(html: str, config: dict, label_nom: str, base_url: str = 
             link_inside = el.select_one("a[href]")
             if link_inside:
                 url_fiche = _resolve_url(link_inside.get("href", ""), base_url)
+        # ID de fiche (sites Tourinsoft : navigation JS, l'ID permet de retrouver l'URL via sitemap)
+        sheet_id = el.get(sheet_id_attr) if sheet_id_attr else None
         txt_complet = el.get_text(" ", strip=True)
         # Nom
         if sel_nom:
@@ -198,6 +201,7 @@ def scrape_avec_config(html: str, config: dict, label_nom: str, base_url: str = 
                 "longitude": None,
                 "label": label_nom,
                 "url_fiche": url_fiche,
+                "_sheet_id": sheet_id,
             })
     return out
 

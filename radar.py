@@ -361,6 +361,9 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
             except (TypeError, ValueError):
                 continue
         else:
+            # Pas de coordonnées (commune introuvable même après Tourinsoft + géocodage).
+            # On garde quand même dans le tableau (Benjamin veut voir tous les orphelins),
+            # avec distance inconnue. Il n'apparaîtra pas sur la carte (pas de position).
             pass
 
         # Vérification d'activité via SIRENE si on a le SIRET (anti-fantômes type Baritaud)
@@ -405,6 +408,7 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
             "source_label_seul": True,
             cle_label: True,
             f"url_{cle_label}": url_fiche,
+            f"nom_label_{cle_label.replace('label_', '')}": nom,
         }
         producteurs.append(nouveau)
         n_ajoutes += 1
@@ -679,9 +683,12 @@ def export_carte(df: pd.DataFrame, mag_lat: float, mag_lon: float, mag_nom: str,
     cols_labels = sorted(set(
         c for c in df.columns if isinstance(c, str) and c.startswith("label_")
     ))
+    # Producteurs géolocalisables (les seuls affichables sur la carte)
+    df_geo = df[df["latitude"].notna() & df["longitude"].notna()] if not df.empty else df
     groupes_par_label = {}
     for col in cols_labels:
-        n_label = int(df[col].fillna(False).astype(bool).sum())
+        # Compte uniquement les producteurs AVEC coordonnées (affichables)
+        n_label = int(df_geo[col].fillna(False).astype(bool).sum()) if col in df_geo.columns else 0
         if n_label == 0:
             continue
         nom_lbl = col.replace("label_", "").replace("_", " ")
