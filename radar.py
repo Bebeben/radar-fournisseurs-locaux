@@ -346,6 +346,8 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
     from sources import sirene as _sirene
     n_ajoutes = 0
     n_fermes = 0
+    n_hors_rayon = 0
+    n_sans_geo = 0
     existants_noms = {(p.get("nom_complet") or "").lower() for p in producteurs}
     for item in items_label:
         nom = item.get("nom") or ""
@@ -357,10 +359,13 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
             try:
                 dist = haversine_km(mag_lat, mag_lon, float(lat), float(lon))
                 if dist > rayon_km:
+                    n_hors_rayon += 1
                     continue
             except (TypeError, ValueError):
+                n_sans_geo += 1
                 continue
         else:
+            n_sans_geo += 1
             # Pas de coordonnées (commune introuvable même après Tourinsoft + géocodage).
             # On garde quand même dans le tableau (Benjamin veut voir tous les orphelins),
             # avec distance inconnue. Il n'apparaîtra pas sur la carte (pas de position).
@@ -412,11 +417,8 @@ def ajouter_producteurs_label_orphelins(producteurs: list[dict], items_label: li
         }
         producteurs.append(nouveau)
         n_ajoutes += 1
-    if n_fermes:
-        # Note : on aurait pu logger via _log mais cette fonction n'y a pas accès,
-        # le compteur est juste un retour secondaire.
-        pass
-    return n_ajoutes
+    return {"ajoutes": n_ajoutes, "hors_rayon": n_hors_rayon,
+            "fermes": n_fermes, "sans_geo": n_sans_geo}
 
 
 # ====================================================================
@@ -516,9 +518,10 @@ def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.Da
         try:
             items = labels.agence_bio(deps, cache_dir, ttl)
             matcher_label_sur_producteurs(producteurs, items, "label_agence_bio")
-            n = ajouter_producteurs_label_orphelins(producteurs, items, "label_agence_bio",
-                                                    lat, lon, rayon)
-            _log(f"[agence_bio] {len(items)} items, {n} orphelins ajoutés")
+            st = ajouter_producteurs_label_orphelins(producteurs, items, "label_agence_bio",
+                                                     lat, lon, rayon, naf_map=naf_map)
+            _log(f"[agence_bio] {len(items)} items : {st['ajoutes']} orphelins ajoutés, "
+                 f"{st['hors_rayon']} hors rayon, {st['sans_geo']} sans géoloc")
         except Exception as e:
             _log(f"[agence_bio] erreur: {e}")
 
@@ -541,10 +544,12 @@ def run(config: dict, naf_map: dict, verbose: bool = True, log_cb=None) -> pd.Da
                 # par SIRET (fiable) ou par même commune + tokens distinctifs communs
                 n_tag = matcher_label_sur_producteurs(producteurs, items, cle_label)
                 # Items qui n'ont pas matché → ajoutés en orphelins si dans le rayon
-                n_orph = ajouter_producteurs_label_orphelins(
+                st = ajouter_producteurs_label_orphelins(
                     producteurs, items, cle_label, lat, lon, rayon, naf_map=naf_map
                 )
-                _log(f"[{nom_source}] {len(items)} items : {n_tag} tagués sur SIRENE, {n_orph} orphelins ajoutés")
+                _log(f"[{nom_source}] {len(items)} items : {n_tag} tagués SIRENE, "
+                     f"{st['ajoutes']} orphelins ajoutés, {st['hors_rayon']} hors rayon, "
+                     f"{st['sans_geo']} sans géoloc")
         except Exception as e:
             _log(f"[regions] erreur: {e}")
 
