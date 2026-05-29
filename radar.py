@@ -253,6 +253,22 @@ def _noms_alternatifs(nom: str) -> list[str]:
     return [v for v in variantes if v and len(v) >= 4]
 
 
+import unicodedata as _ud
+
+
+def _norm_commune(commune: str) -> str:
+    """Normalise un nom de commune pour comparaison exacte :
+    minuscules, sans accents, tirets/apostrophes → espaces, espaces compactés.
+    'Saint-Léonard-de-Noblat' == 'SAINT LEONARD DE NOBLAT'."""
+    if not commune:
+        return ""
+    s = commune.lower().strip()
+    s = "".join(c for c in _ud.normalize("NFD", s) if _ud.category(c) != "Mn")
+    s = _re_match.sub(r"[\-'’]", " ", s)
+    s = _re_match.sub(r"\s+", " ", s).strip()
+    return s
+
+
 def _tokens_significatifs(nom_normalise: str) -> set[str]:
     """Renvoie les tokens significatifs d'un nom (mots ≥ 4 caractères, hors mots communs)."""
     mots_communs = {"ferme", "domaine", "maison", "gaec", "earl", "sarl", "scea", "ei",
@@ -263,64 +279,60 @@ def _tokens_significatifs(nom_normalise: str) -> set[str]:
 def matcher_label_sur_producteurs(producteurs: list[dict], items_label: list[dict], cle_label: str) -> int:
     """Tag les producteurs SIRENE qui correspondent à un item label.
 
-    Règle stricte (anti-faux-positifs) : on tag UN producteur SIRENE pour UN item label,
-    et seulement si une de ces conditions est vraie :
-      - Match SIRET (sûr à 100%)
-      - Même commune ET ≥ 1 token significatif commun ET fuzz token_set_ratio ≥ 70
-      - Fuzz token_set_ratio ≥ 95 (match quasi-exact même sans commune)
+    RÈGLE (validée par Benjamin) : un label se rattache à un producteur SIRENE si et seulement si
+      - Match SIRET (sûr à 100%), OU
+      - MÊME COMMUNE EXACTE  ET  ≥ 1 token distinctif commun dans le nom.
 
-    "Token significatif" = mot ≥ 4 chars, hors mots communs (Ferme, GAEC, Saint...).
-    Ex : "Maison Apicole Oizon" (label) vs "OIZON HERVE" (SIRENE) → token commun "oizon"
-         + même commune → match.
+    Plus de "commune différente → seuil élevé" : ça laissait passer des faux positifs via les
+    variantes courtes (ex. "(MARTIN)" → token "martin" qui matche "Martin Pouret" à 100%).
+    La commune exacte est désormais OBLIGATOIRE (sauf match SIRET).
+
+    "Token distinctif" = mot ≥ 4 chars, hors mots génériques (Ferme, GAEC, Saint, Maison...).
     Renvoie le nombre de tags appliqués.
     """
     n_tag = 0
     for item in items_label:
-        nom_l_raw = item.get("nom") or ""
-        nom_l = _normaliser_nom(nom_l_raw)
-        commune_l = (item.get("commune") or "").lower().strip()
+        nom_l = _normaliser_nom(item.get("nom") or "")
+        commune_l = _norm_commune(item.get("commune") or "")
         siret_l = (item.get("siret") or "")
         if not nom_l or len(nom_l) < 4:
             continue
-        # Garde-fou : sans commune ET sans SIRET, on ne peut pas matcher de façon fiable
-        # (les noms seuls produisent des faux positifs). On skip cet item.
         if not commune_l and not siret_l:
-            continue
+            continue  # ni commune ni SIRET → non matchable de façon fiable
         tokens_l = _tokens_significatifs(nom_l)
 
+        # 1) Match SIRET (prioritaire)
+        matched = False
+        if siret_l:
+            for p in producteurs:
+                if p.get("siret") == siret_l:
+                    _appliquer_tag(p, cle_label, item)
+                    n_tag += 1
+                    matched = True
+                    break
+        if matched:
+            continue
+
+        # 2) Sinon : MÊME COMMUNE EXACTE + token distinctif commun
+        if not commune_l or not tokens_l:
+            continue
+        best_idx, best_score = -1, 0
         for i, p in enumerate(producteurs):
-            if siret_l and p.get("siret") == siret_l:
-                # Match SIRET définitif
-                _appliquer_tag(p, cle_label, item)
-                n_tag += 1
-                break
-        else:
-            # Pas de match SIRET — fallback nom + commune
-            best_idx, best_score = -1, 0
-            for i, p in enumerate(producteurs):
-                commune_p = (p.get("commune") or "").lower().strip()
-                meme_commune = bool(commune_l and commune_p and commune_l == commune_p)
-
-                variantes = _noms_alternatifs(p.get("nom_complet") or "")
-                for variante in variantes:
-                    if len(variante) < 4:
-                        continue
-                    tokens_p = _tokens_significatifs(_normaliser_nom(variante))
-                    score = fuzz.token_set_ratio(nom_l, _normaliser_nom(variante))
-
-                    # Critère strict
-                    accepte = False
-                    if score >= 95:
-                        accepte = True  # match quasi-exact
-                    elif meme_commune and score >= 70 and (tokens_l & tokens_p):
-                        accepte = True  # même commune + token distinctif commun
-
-                    if accepte and score > best_score:
-                        best_idx, best_score = i, score
-
-            if best_idx >= 0:
-                _appliquer_tag(producteurs[best_idx], cle_label, item)
-                n_tag += 1
+            commune_p = _norm_commune(p.get("commune") or "")
+            if commune_p != commune_l:
+                continue  # commune DOIT être identique
+            # Au moins un token distinctif commun entre nom label et nom SIRENE
+            tokens_p = set()
+            for variante in _noms_alternatifs(p.get("nom_complet") or ""):
+                tokens_p |= _tokens_significatifs(_normaliser_nom(variante))
+            if not (tokens_l & tokens_p):
+                continue
+            score = fuzz.token_set_ratio(nom_l, _normaliser_nom(p.get("nom_complet") or ""))
+            if score > best_score:
+                best_idx, best_score = i, score
+        if best_idx >= 0:
+            _appliquer_tag(producteurs[best_idx], cle_label, item)
+            n_tag += 1
     return n_tag
 
 
